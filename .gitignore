@@ -1,0 +1,5 @@
+dist
+/node_modules/
+docbook/doc
+.project
+.settings

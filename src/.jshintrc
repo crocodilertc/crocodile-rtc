@@ -1,0 +1,31 @@
+{
+  "curly": true,
+  "eqeqeq": true,
+  "immed": true,
+  "latedef": true,
+  "newcap": true,
+  "noarg": true,
+  "sub": true,
+  "undef": true,
+  "unused": true,
+  "boss": true,
+  "eqnull": true,
+  "browser": true,
+  "jquery": true,
+  "globals": {
+    "console": false,
+    "CrocSDK": true,
+	"JsSIP": true,
+	"CrocMSRP": false,
+	"JSJaCWebSocketConnection": false,
+	"JSJaCPresence": false,
+	"JSJaCMessage": false,
+	"JSJaCIQ": false,
+	"JSJaCJID": false,
+	"JSJaCConsoleLogger": false,
+	"ERR_FEATURE_NOT_IMPLEMENTED": false,
+	"ERR_BAD_REQUEST": false,
+	"NS_ROSTER": false,
+	"NS_STANZAS": false
+  }
+}

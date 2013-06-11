@@ -1,0 +1,34 @@
+{
+  "name": "crocodile-rtc",
+  "title": "Crocodile WebRTC SDK: JavaScript Library",
+  "description": "Simplified web-based real-time communications built around WebRTC, SIP, MSRP, and XMPP.",
+  "version": "1.0",
+  "homepage": "https://www.crocodilertc.net",
+  "author": {
+    "name": "Crocodile RCS Ltd",
+    "url": "http://crocodile-rcs.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/crocodilertc/crocodile-rtc.git"
+  },
+  "bugs": "https://github.com/crocodilertc/crocodile-rtc/issues",
+  "licenses": [
+    {
+      "type": "MIT",
+      "url": "https://raw.github.com/crocodilertc/crocodile-rtc/master/LICENSE"
+    }
+  ],
+  "dependencies": {
+    "jquery": "1.9.1",
+    "jssip": "0.3.0-crocodile-1",
+    "crocodile-msrp": "1.0",
+    "jsjac": "git://github.com/sstrigler/JSJaC.git#6c2d4f78d49f18aa8bd0f7c4c278b873d22c7451"
+  },
+  "bundledDependencies": [
+    "jssip",
+    "crocodile-msrp",
+    "jssac"
+  ],
+  "keywords": ["webrtc", "websocket", "sip", "msrp", "xmpp"]
+}
