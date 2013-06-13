@@ -15,6 +15,7 @@
   "globals": {
     "console": false,
     "CrocSDK": false,
+    "JSJaCIQ": false,
     "testApiKey": false,
     "testUsers": false,
     "QUnit": false,

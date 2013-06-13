@@ -1122,6 +1122,72 @@
 			
 		});
 	});
+	
+	QUnit.asyncTest("Send status message", 7, function(assert) {
+		var croc1 = $.croc(config1);
+		var croc2 = $.croc(config2);
+		var croc2Session = null;
+		var state = 'idle';
+		// Give up if the test has hung for too long
+		var hungTimerId = setTimeout(function() {
+			assert.ok(false, 'Aborting hung test');
+			croc1.disconnect();
+			croc2.disconnect();
+		}, 10000);
+
+		var testContentType = 'application/im-iscomposing+xml';
+
+		// Set up the receiver's event handlers
+		croc2.data.onDataSession = function (event) {
+			event.session.accept();
+			
+			event.session.onComposingStateChange = function(event) {
+				assert.ok(true, 'onComposingStateChange fired for croc2');
+				assert.strictEqual(event.state, 'idle', "expected value of state for croc2");
+			};
+			
+			croc2Session = event.session;
+		};
+
+		croc1.data.onComposingStateChange = function (event) {
+			assert.ok(true, 'onComposingStateChange fired for croc 1');
+			
+			// Check event object properties
+			assert.strictEqual(event.state, state, 'Event state correct');
+		};
+
+		// Wait for receiver to register before sending the data
+		croc2.sipUA.on('registered', function () {
+			var session = croc1.data.setComposingState(config2.address, strData, {
+				type: 'msrp',
+				contentType: testContentType,
+				onSuccess: function () {
+					assert.ok(true, 'TransferProgress.onSuccess event fired');
+					
+					croc2Session.setComposingState({
+						type: 'msrp',
+						contentType: testContentType,
+						onSuccess: function () {
+							assert.ok(true, 'TransferProgress.onSuccess event fired');
+							
+							// Successful send - close the session
+							this.session.close();
+						}
+					}, state);
+				}
+			}, state);
+
+			// Clean up the croc objects when the session closes
+			session.onClose = function () {
+				assert.ok(true, 'DataSession.onClose event fired');
+				clearTimeout(hungTimerId);
+				croc1.disconnect();
+				croc2.disconnect();
+			};
+		});
+
+		// QUnit will restart once the second croc object has disconnected
+	});
 
 	QUnit.asyncTest("Send XHTML data", 10, function(assert) {
 		var croc1 = $.croc(config1);
