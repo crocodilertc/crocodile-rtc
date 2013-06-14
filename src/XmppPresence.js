@@ -1,7 +1,6 @@
 (function(CrocSDK) {
 
 	var allowedAvailability = ['away', 'dnd'];
-	var NS_REACH = 'urn:xmpp:reach:0';
 
 	/**
 	 * The user or contact's current availability.  Can take one of the
@@ -246,11 +245,11 @@
 		}
 
 		// Add 'reachability' address as per draft-ivov-xmpp-cusax-05/XEP-0152
-		if (!presence.getChild('reach', NS_REACH)) {
+		if (!presence.getChild('reach', CrocSDK.C.NS.XMPP_REACH)) {
 			var addr = presence.buildNode('addr', {
 				'uri': 'sip:' + croc.address
 			});
-			presence.appendNode('reach', {}, [addr], NS_REACH);
+			presence.appendNode('reach', {}, [addr], CrocSDK.C.NS.XMPP_REACH);
 		}
 
 		return presence;
@@ -644,13 +643,16 @@
 			}
 		});
 		
+		// Register handlers for supported IQ requests
+		con.registerIQGet('query', NS_DISCO_INFO, this._processServiceDiscovery.bind(this));
+		con.registerIQSet('query', NS_ROSTER, this._processRosterPush.bind(this));
+
+		// Register catch-all handler for unsupported IQ requests
 		con.registerHandler('iq', function (iq) {
-			// Catch-all for IQs that have don't have their own handlers
 			console.log('Received unhandled IQ:', iq.xml());
 			con.send(iq.errorReply(ERR_FEATURE_NOT_IMPLEMENTED));
 		});
 
-		con.registerIQSet('query', NS_ROSTER, this._processRosterPush.bind(this));
 		// Process subscription requests
 		con.registerHandler('presence', '*', '*', 'subscribe', this._processSubscribe.bind(this));
 
@@ -663,6 +665,34 @@
 
 		// Process presence updates
 		con.registerHandler('presence', this._processPresence.bind(this));
+	};
+
+	/**
+	 * Processes incoming XMPP service discovery requests.
+	 * 
+	 * @private
+	 * @memberof CrocSDK.XmppPresenceAPI
+	 * @param {JSJaCIQ} request
+	 * @returns <code>true</code> to prevent the event bubbling
+	 */
+	CrocSDK.XmppPresenceAPI.prototype._processServiceDiscovery = function (request) {
+		var con = this.crocObject.xmppCon;
+		var response = new JSJaCIQ();
+		response.setIQ(request.getFrom(), 'result', request.getID());
+		
+		var featureNodeReceipts = response.buildNode('feature',
+				{'var': CrocSDK.C.NS.XMPP_RECEIPTS});
+		var featureNodeChat = response.buildNode('feature',
+				{'var': NS_CHAT_STATES});
+		var featureNodeXHTML = response.buildNode('feature',
+				{'var': CrocSDK.C.NS.XMPP_XHTML_IM});
+		
+		var queryNode = response.buildNode('query', {xmlns: NS_DISCO_INFO},
+				[featureNodeReceipts, featureNodeChat, featureNodeXHTML]);
+		response.appendNode(queryNode);
+		
+		con.send(response);
+		return true;
 	};
 
 	/**

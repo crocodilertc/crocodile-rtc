@@ -1,20 +1,4 @@
 (function(CrocSDK) {
-	
-	// Global variables
-	var dataSessionState = {
-			PENDING: 'pending',
-			ESTABLISHED: 'established',
-			CLOSED: 'closed'
-	};
-	var notificationState = {
-			ACTIVE: 'active',
-			IDLE: 'idle'
-	};
-	var composingState = {
-		CLOSED : 'gone',
-		COMPOSING: 'composing'
-	};
-
 	/**
 	 * Determines the next MSRP connection to use (round-robin).
 	 * 
@@ -99,8 +83,10 @@
 		};
 
 		// Message receiving events
-		eventObj.onFirstChunkReceived = function(id, contentType, filename, size, description) {
-			var tp = new TransferProgress(dataSession, id, false, contentType, size, filename, description);
+		eventObj.onFirstChunkReceived = function(id, contentType, filename,
+				size, description) {
+			var tp = new TransferProgress(dataSession, id, false, contentType,
+					size, filename, description);
 			dataSession.recvTransferProgress[id] = tp;
 
 			CrocSDK.Util.fireEvent(dataSession, 'onDataStart', {
@@ -133,53 +119,45 @@
 				});
 			}
 
+			var prevSdkState = CrocSDK.C.states.sdkComposing.IDLE;
+
+			if (dataSession.remoteActiveTimeoutId) {
+				// We were expecting a message - clear the timeout
+				clearTimeout(dataSession.remoteActiveTimeoutId);
+				dataSession.remoteActiveTimeoutId = null;
+				prevSdkState = CrocSDK.C.states.sdkComposing.COMPOSING;
+			}
+
 			// Then fire the appropriate onData event
-			if (contentType === 'application/im-iscomposing+xml' &&
-					dataSession.hasOwnProperty('onComposingStateChange') ||
-					dataSession.dataApi.hasOwnProperty('onComposingStateChange')) {
-				
+			if (contentType === CrocSDK.C.MT.IS_COMPOSING &&
+					dataSession.hasOwnProperty('onComposingStateChange')) {
+				// Process "is composing" message - see RFC 3994
 				var domParser = new DOMParser();
-				var bodyToXML = domParser.parseFromString(body, "text/xml");
-				
-				var stateElem = bodyToXML.getElementsByTagName("state")[0];
-				var stateElemChild = stateElem.childNodes[0];
-				var state = stateElemChild.nodeValue;
-				
-				var refreshElem = bodyToXML.getElementsByTagName("refresh")[0];
-				var refreshElemChild = refreshElem.childNodes[0];
-				
-				/* RFC 3994: "refresh element is expressed in integer seconds" 
-				 * Switch back to milliseconds for timer.*/
-				var refreshInterval = parseInt(refreshElemChild.nodeValue, 10) * 1000;
-					
-				switch (state) {
-				case notificationState.IDLE:
-					
-					CrocSDK.Util.fireEvent(this, 'onComposingStateChange', {
-						state: state
-					}, true);
-					break;
-				case notificationState.ACTIVE:
-					
-					if (this.refreshReceivedState) {
-						clearInterval(this.refreshReceivedState);
+				var doc = domParser.parseFromString(body, contentType);
+				var state = doc.getElementsByTagName("state")[0].firstChild.data;
+
+				var sdkState = CrocSDK.Util.rfc3994StateToSdkState(state);
+				if (sdkState === CrocSDK.C.states.sdkComposing.COMPOSING) {
+					var refreshTimeout = 120;
+					var refreshNode = doc.getElementsByTagName("refresh")[0];
+					if (refreshNode) {
+						refreshTimeout = parseInt(refreshNode.firstChild.data, 10);
+						refreshTimeout = refreshTimeout * 1.1;
 					}
-					
-					this.refreshReceivedState = setInterval(function() {
-						CrocSDK.Util.fireEvent(this, 'onComposingStateChange', {
-							state: notificationState.IDLE
-						}, true);
-					}, refreshInterval);
-					
-					CrocSDK.Util.fireEvent(this, 'onComposingStateChange', {
-						state: composingState.COMPOSING
-					}, true);
-					break;
-				default:
-					throw new CrocSDK.Exceptions.ValueError('Received incorrect state value:' + state);
+					// Start timeout for remote active refresh
+					dataSession.remoteActiveTimeoutId = setTimeout(function() {
+						CrocSDK.Util.fireEvent(dataSession, 'onComposingStateChange', {
+							state: CrocSDK.C.states.sdkComposing.IDLE
+						});
+					}, refreshTimeout * 1000);
 				}
 
-			} else if (contentType === 'application/xhtml+xml' &&
+				if (sdkState !== prevSdkState) {
+					CrocSDK.Util.fireEvent(dataSession, 'onComposingStateChange', {
+						state: sdkState
+					});
+				}
+			} else if (contentType === CrocSDK.C.MT.XHTML &&
 					dataSession.hasOwnProperty('onXHTMLReceived') ||
 					dataSession.dataApi.hasOwnProperty('onXHTMLReceived')) {
 				CrocSDK.Util.fireEvent(dataSession, 'onXHTMLReceived', {
@@ -223,13 +201,14 @@
 		};
 	}
 
-	function handleOutgoingSipSessionStarted(crocObject, dataSession, response, sendConfig, data, mimetype) {
+	function handleOutgoingSipSessionStarted(crocObject, dataSession, response,
+			sendConfig, data, mimetype) {
 		var capabilityApi = crocObject.capability;
 		var msgId = dataSession.msrpSession.processSdpAnswer(response.body);
 
 		if (msgId) {
 			// Update data session properties
-			dataSession.state = dataSessionState.ESTABLISHED;
+			dataSession.state = CrocSDK.C.states.dataSession.ESTABLISHED;
 			dataSession.lastActivity = Date.now();
 			var parsedContactHeader = response.parseHeader('contact', 0);
 			dataSession.capabilities = capabilityApi.parseFeatureTags(
@@ -253,7 +232,8 @@
 				}
 
 				var chunkSender = dataSession.msrpSession.chunkSenders[msgId];
-				var tp = new TransferProgress(dataSession, msgId, true, mimetype, chunkSender.size, filename, description);
+				var tp = new TransferProgress(dataSession, msgId, true,
+						mimetype, chunkSender.size, filename, description);
 				if (sendConfig.onSuccess) {
 					tp.onSuccess = sendConfig.onSuccess;
 				}
@@ -325,7 +305,8 @@
 	 * @inner
 	 * @type {CrocSDK.MsrpDataSession~TransferProgress}
 	 */
-	function TransferProgress(dataSession, msgId, outbound, contentType, size, filename, description) {
+	function TransferProgress(dataSession, msgId, outbound, contentType, size,
+			filename, description) {
 		// Internal properties (undocumented)
 		this.msgId = msgId;
 		this.outbound = outbound;
@@ -487,20 +468,30 @@
 	 *            address The address of the user to establish a session with.
 	 */
 	MsrpDataSession.prototype.init = function(dataApi, address) {
+		var self = this;
 		// Internal state
 		this.dataApi = dataApi;
 		this.sipSession = null;
 		this.msrpSession = null;
-		this.state = dataSessionState.PENDING;
+		this.state = CrocSDK.C.states.dataSession.PENDING;
 		this.lastActivity = Date.now();
 		this.sendTransferProgress = {};
 		this.recvTransferProgress = {};
+		// Composing state timers
+		this.localActiveRefreshIntervalId = null;
+		this.localActiveTimeoutId = null;
+		this.remoteActiveTimeoutId = null;
 
-		// Chat state message timers
-		this.refreshActiveComposingState = null;
-		this.timeoutBackToIdle = null;
-		this.refreshReceivedState = null;
-		this.countComposingSend = 0;
+		// Frequently-used objects
+		this.idleXml = CrocSDK.Util.createIsComposingXml(
+				CrocSDK.C.states.rfcComposing.IDLE);
+		this.isComposingSendConfig = {contentType: CrocSDK.C.MT.IS_COMPOSING};
+		this.localActiveTimeout = function () {
+			clearInterval(self.localActiveRefreshIntervalId);
+			self.localActiveRefreshIntervalId = null;
+			self.localActiveTimeoutId = null;
+			self.send(self.idleXml, self.isComposingSendConfig);
+		};
 
 		// Public properties
 		/**
@@ -582,8 +573,9 @@
 	MsrpDataSession.prototype.send = function(data, config) {
 		var mimetype = null, filename = null, description = null;
 
-		if (this.state !== dataSessionState.ESTABLISHED) {
-			throw new CrocSDK.Exceptions.StateError('Cannot call send() in current state: ' + this.state);
+		if (this.state !== CrocSDK.C.states.dataSession.ESTABLISHED) {
+			throw new CrocSDK.Exceptions.StateError(
+					'Cannot call send() in current state: ' + this.state);
 		}
 
 		if (config) {
@@ -596,14 +588,25 @@
 			}
 		}
 
+		var msgId = this.msrpSession.send(data, mimetype);
 		this.lastActivity = Date.now();
 
-		var msgId = this.msrpSession.send(data, mimetype);
+		// Clear local composing timers/intervals
+		if (this.localActiveRefreshIntervalId) {
+			clearInterval(this.localActiveRefreshIntervalId);
+			this.localActiveRefreshIntervalId = null;
+		}
+		if (this.localActiveTimeoutId) {
+			clearTimeout(this.localActiveTimeoutId);
+			this.localActiveTimeoutId = null;
+		}
 
 		// Create a transfer progress object if any event handlers are provided
 		if (config.onSuccess || config.onFailure || config.onProgress) {
 			var chunkSender = this.msrpSession.chunkSenders[msgId];
-			var tp = new TransferProgress(this, msgId, true, chunkSender.contentType, chunkSender.size, filename, description);
+			var tp = new TransferProgress(this, msgId, true,
+					chunkSender.contentType, chunkSender.size, filename,
+					description);
 			if (config.onSuccess) {
 				tp.onSuccess = config.onSuccess;
 			}
@@ -618,77 +621,6 @@
 	};
 	
 	/**
-	 * <p>
-	 * Send a state message using this session.
-	 * </p>
-	 * 
-	 * @param {CrocSDK.DataAPI~SendConfig} [config] - Optional extra
-	 * configuration that can be provided when sending data.  If this object is
-	 * omitted, the defaults will be used.
-	 * @param {String} [state]
-	 * @returns {CrocSDK.MsrpDataSession} DataSession
-	 * @throws {TypeError}
-	 * @throws {CrocSDK.Exceptions#ValueError}
-	 * @throws {CrocSDK.Exceptions#VersionError}
-	 * @throws {CrocSDK.Exceptions#StateError}
-	 */
-	MsrpDataSession.prototype.setComposingState = function(config, state) {
-		var session = this;
-		var xml;
-		var refreshInterval  = this.dataApi.idleTimeout / 2 * 1000;
-		
-		config = config || {};
-		config.contentType = 'application/im-iscomposing+xml';
-		state = state || composingState.COMPOSING;
-		
-		if (state === notificationState.IDLE) {
-			this.countComposingSend = 0;
-			
-			xml = this.dataApi._createIsComposingXML(state);
-			
-			if (this.timeoutBackToIdle) {
-				clearTimeout(this.timeoutBackToIdle);
-			}
-			
-			this.send(xml, config);
-		}
-		
-		if (state === composingState.COMPOSING) {
-			
-			// RFC 3994 states refresh element is expressed in integer seconds
-			var refreshElemInterval = refreshInterval / 1000;
-			xml = this._createIsComposingXML(notificationState.ACTIVE, refreshElemInterval);
-			
-			if (this.timeoutBackToIdle) {
-				clearTimeout(this.timeoutBackToIdle);
-			}
-			
-			this.timeoutBackToIdle = setTimeout(function() {
-				session.setComposingState(config, notificationState.IDLE);
-			}, 15000);
-			
-			if (this.countComposingSend < 1) {
-				if (this.refreshActiveComposingState) {
-					clearInterval(this.refreshActiveComposingState);
-				}
-				
-				this.refreshActiveComposingState = setInterval(function() {
-					// Send another composing message
-					session.send(xml, config);
-				}, refreshInterval);
-				
-				// Send first composing message
-				this.send(xml, config);
-				// Count first send
-				this.countComposingSend++;
-			}
-		}
-		
-		this.send(xml, config);
-			
-	};
-
-	/**
 	 * Send the provided XHTML <code>body</code> using this session.
 	 * 
 	 * @param {DocumentFragment|string} body - The body of the message.
@@ -701,10 +633,54 @@
 	 */
 	MsrpDataSession.prototype.sendXHTML = function(body, config) {
 		config = config || {};
-		config.contentType = 'application/xhtml+xml';
+		config.contentType = CrocSDK.C.MT.XHTML;
 
 		var xhtml = CrocSDK.Util.createValidXHTMLDoc(body);
 		this.send(xhtml, config);
+	};
+
+	/**
+	 * Set the local composing state for this session.
+	 * 
+	 * @param {String} [state] - Should be set to <code>'composing'</code> or
+	 * <code>'idle'</code>.  Defaults to <code>'composing'</code> if not
+	 * specified.
+	 * @throws {CrocSDK.Exceptions#StateError}
+	 */
+	MsrpDataSession.prototype.setComposingState = function(state) {
+		var session = this;
+		state = state || CrocSDK.C.states.sdkComposing.COMPOSING;
+
+		if (this.localActiveTimeoutId) {
+			// We're currently in the COMPOSING state
+			// Clear the old idle timeout
+			clearTimeout(this.localActiveTimeoutId);
+
+			if (state === CrocSDK.C.states.sdkComposing.IDLE) {
+				// We're changing state to IDLE - send an update
+				this.send(this.idleXml, this.isComposingSendConfig);
+			}
+		}
+
+		if (state === CrocSDK.C.states.sdkComposing.COMPOSING) {
+			if (!this.localActiveRefreshIntervalId) {
+				// We're currently in the IDLE state
+				// We're changing state to COMPOSING - send an update
+				var refreshInterval = this.dataApi.idleTimeout / 2;
+				var compXml = CrocSDK.Util.createIsComposingXml(state, refreshInterval);
+
+				this.send(compXml, this.isComposingSendConfig);
+
+				// Set up the active refresh interval
+				this.localActiveRefreshIntervalId = setInterval(function () {
+					session.send(compXml, session.isComposingSendConfig);
+				}, refreshInterval * 1000);
+			}
+
+			// Set the active->idle timeout
+			this.localActiveTimeoutId = setTimeout(this.localActiveTimeout,
+					CrocSDK.C.COMPOSING_TIMEOUT * 1000);
+		}
 	};
 
 	/**
@@ -768,12 +744,12 @@
 	 * @function CrocSDK.MsrpDataSession#close
 	 */
 	MsrpDataSession.prototype.close = function(status) {
-		if (this.state === dataSessionState.CLOSED) {
+		if (this.state === CrocSDK.C.states.dataSession.CLOSED) {
 			return;
 		}
 
 		var oldState = this.state;
-		this.state = dataSessionState.CLOSED;
+		this.state = CrocSDK.C.states.dataSession.CLOSED;
 
 		if (!status) {
 			status = 'normal';
@@ -790,7 +766,8 @@
 
 		if (this.sipSession) {
 			var terminateOptions = null;
-			if (oldState === dataSessionState.PENDING && this.sipSession.direction === 'incoming') {
+			if (oldState === CrocSDK.C.states.dataSession.PENDING &&
+					this.sipSession.direction === 'incoming') {
 				// Rejecting the session
 				var sipStatus = CrocSDK.Util.sdkStatusToSipStatus('invite',
 						status);
@@ -806,17 +783,20 @@
 			}
 		}
 		
-		if (this.activeStateRefresh) {
-			clearInterval(this.dataApi.activeStateRefresh);
+		// Clean up any composing state timers/intervals
+		if (this.localActiveRefreshIntervalId) {
+			clearInterval(this.localActiveRefreshIntervalId);
+			this.localActiveRefreshIntervalId = null;
 		}
-		
-		if (this.dataApi.stateIdleTimeOut) {
-			clearInterval(this.dataApi.stateIdleTimeOut);
+		if (this.localActiveTimeoutId) {
+			clearTimeout(this.localActiveTimeoutId);
+			this.localActiveTimeoutId = null;
 		}
-		
-		if (this.dataApi.hasOwnProperty('onComposingStateChange')) {
-			this.dataApi.onComposingStateChange['state'] = notificationState.CLOSED;
+		if (this.remoteActiveTimeoutId) {
+			clearTimeout(this.remoteActiveTimeoutId);
+			this.remoteActiveTimeoutId = null;
 		}
+
 
 		// Notify application
 		CrocSDK.Util.fireEvent(this, 'onClose', {
@@ -861,8 +841,8 @@
 	 * {@link CrocSDK.DataAPI#event:onData Data.onData()} handler.
 	 * 
 	 * @event CrocSDK.MsrpDataSession#onData
-	 * @param {CrocSDK.DataAPI~OnDataEvent}
-	 *            [onDataEvent] The event object assocated with this event.
+	 * @param {CrocSDK.DataAPI~OnDataEvent} event - The event object assocated
+	 * with this event.
 	 */
 	MsrpDataSession.prototype.onData = function(event) {
 		// Default behaviour is to fire the top-level onData event
@@ -878,7 +858,7 @@
 	 * If this event is not handled the received data will be discarded.
 	 * 
 	 * @event CrocSDK.MsrpDataSession#onXHTMLReceived
-	 * @param {CrocSDK.DataAPI~OnXHTMLReceivedEvent} [event] The event object
+	 * @param {CrocSDK.DataAPI~OnXHTMLReceivedEvent} event - The event object
 	 * associated with this event.
 	 */
 	MsrpDataSession.prototype.onXHTMLReceived = function(event) {
@@ -887,19 +867,12 @@
 	};
 	
 	/**
-	 * <p>
-	 * Dispatched if and only if the user has defined the event handler in 
-	 * initial setup of the Croc Object.
-	 * </p>
+	 * Dispatched whenever the composing state of the remote party changes.
 	 * 
-	 * @event CrocSDK.XmppDataSession#onComposingStateChange
-	 * @param {CrocSDK.XmppDataSession~OnComposingStateChangeEvent} 
-	 * onComposingStateChangeEvent The event object associated to this event
+	 * @event CrocSDK.MsrpDataSession#onComposingStateChange
+	 * @param {CrocSDK.MsrpDataSession~OnComposingStateChangeEvent} event - The
+	 * event object associated with this event.
 	 */
-	MsrpDataSession.prototype.onComposingStateChange = function(event) {
-		// Default behaviour is to fire the top-level onComposingStateChange event
-		this.dataApi.onComposingStateChange(event);
-	};
 
 	/**
 	 * <p>
@@ -921,8 +894,8 @@
 	 * </p>
 	 * 
 	 * @event CrocSDK.MsrpDataSession#onDataStart
-	 * @param {CrocSDK.MsrpDataSession~OnDataStartEvent}
-	 *            [onDataStartEvent] The event object assocated with this event.
+	 * @param {CrocSDK.MsrpDataSession~OnDataStartEvent} event - The event object
+	 * assocated with this event.
 	 */
 	MsrpDataSession.prototype.onDataStart = function() {
 		// Do nothing
@@ -930,8 +903,8 @@
 
 	/**
 	 * @event CrocSDK.MsrpDataSession#onClose
-	 * @param {CrocSDK.MediaAPI~MediaSession~OnCloseEvent}
-	 *            [onCloseEvent] The event object assocated with this event. 
+	 * @param {CrocSDK.MediaAPI~MediaSession~OnCloseEvent} event - The event object
+	 * assocated with this event. 
 	 * */
 	MsrpDataSession.prototype.onClose = function() {
 		// Do nothing
@@ -1045,7 +1018,7 @@
 			if (answer) {
 				if (dataSession.accepted) {
 					// Session has already been accepted; send the SDP answer.
-					dataSession.state = dataSessionState.ESTABLISHED;
+					dataSession.state = CrocSDK.C.states.dataSession.ESTABLISHED;
 					dataSession.sipSession.answer({
 						sdp : answer
 					});
@@ -1053,7 +1026,7 @@
 					// Session not yet accepted; override the accept method
 					// to send the SDP answer.
 					dataSession.accept = function() {
-						this.state = dataSessionState.ESTABLISHED;
+						this.state = CrocSDK.C.states.dataSession.ESTABLISHED;
 						this.sipSession.answer({
 							sdp : answer
 						});
@@ -1098,7 +1071,7 @@
 	CrocSDK.IncomingMsrpSession.prototype.contructor = CrocSDK.IncomingMsrpSession;
 
 	CrocSDK.IncomingMsrpSession.prototype.accept = function() {
-		if (this.state === dataSessionState.PENDING) {
+		if (this.state === CrocSDK.C.states.dataSession.PENDING) {
 			this.accepted = true;
 		} else {
 			throw new CrocSDK.Exceptions.StateError('Session has already been accepted');

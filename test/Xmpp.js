@@ -35,8 +35,6 @@
 		start: false
 	};
 	
-	var NS_DISCO = 'http://jabber.org/protocol/disco#info';
-
 	function removeExistingContacts(contacts) {
 		for (var i = 0, len = contacts.length; i < len; i++) {
 			var contact = contacts[i];
@@ -422,85 +420,20 @@
 		// QUnit will restart once the second croc object has disconnected
 	});
 	
-	QUnit.asyncTest("XMPP send with chat notifications", 4, function(assert) {
-		var croc1 = $.croc(config1);
-		var croc2 = $.croc(config2);
-		var firstReady = false;
-		var state = 'idle';
-		var strData = 'XMPP test message ' + new Date();
-		var hungTimerId = setTimeout(function() {
-			assert.ok(false, 'Aborting hung test');
-			croc1.presence.stop();
-			croc2.presence.stop();
-			hungTimerId = null;
-		}, 6000);
-		
-		croc1.presence.start();
-		croc2.presence.start();
-
-		croc1.presence.onDisconnected = function () {
-			// Make sure we're stopped
-			this.stop();
-		};
-		croc2.presence.onDisconnected = function () {
-			// Make sure we're stopped
-			this.stop();
-			if (hungTimerId) {
-				clearTimeout(hungTimerId);
-				hungTimerId = null;
-			}
-			QUnit.start();
-		};
-		
-		croc2.data.onDataSession = function (event) {
-			event.session.accept();
-			event.session.setComposingState(state);
-		};
-		
-		croc1.data.onComposingStateChange = function (event) {
-			assert.ok(true, "onComposingStateChange fired croc1");
-			assert.strictEqual(event.state, 'idle', "expected state for croc1");
-			
-			croc1.presence.stop();
-			croc2.presence.stop();
-			clearTimeout(hungTimerId);
-			hungTimerId = null;
-		};
-		
-		croc2.data.onComposingStateChange = function (event) {
-			assert.ok(true, "onComposingStateChange fired croc2");
-			assert.strictEqual(event.state, 'idle', "expected state for croc2");
-		};
-		
-		var onReady = function () {
-			if (firstReady) {
-				// Both now connected
-				croc1.data.setComposingState(config2.address, strData, {
-					type: 'xmpp'
-				}, state);
-			} else {
-				firstReady = true;
-			}
-		};
-
-		croc1.presence.onSelfNotify = onReady;
-		croc2.presence.onSelfNotify = onReady;
-
-		// QUnit will restart once the second croc object has disconnected
-	});
-	
-	QUnit.asyncTest("XMPP send with delivery receipts", 2, function(assert) {
+	QUnit.asyncTest("XMPP send with chat notifications", 5, function(assert) {
 		var croc1 = $.croc(config1);
 		var croc2 = $.croc(config2);
 		var firstReady = false;
 		var session = null;
+		var numNotifications = 0;
 		var strData = 'XMPP test message ' + new Date();
 		var hungTimerId = setTimeout(function() {
 			assert.ok(false, 'Aborting hung test');
 			croc1.presence.stop();
 			croc2.presence.stop();
 			hungTimerId = null;
-		}, 6000);
+		}, 30000);
+		var idleTimerId = null;
 		
 		croc1.presence.start();
 		croc2.presence.start();
@@ -520,12 +453,29 @@
 		};
 		
 		croc2.data.onDataSession = function (event) {
-			event.session.accept();
-		};
-		
-		croc1.data.onDataSession = function (event) {
-			event.session.onSuccess = function () {
-				assert.ok(true, "xmpp onSuccess fired");
+			event.session.onComposingStateChange = function (event) {
+				numNotifications++;
+				if (numNotifications === 1) {
+					assert.strictEqual(event.state, 'composing', 'croc1 is composing');
+					idleTimerId = setTimeout(function () {
+						assert.ok(false, 'No idle notification');
+					}, 16000);
+				} else if (numNotifications === 2) {
+					clearTimeout(idleTimerId);
+					assert.strictEqual(event.state, 'idle', 'croc1 is idle (timeout)');
+					session.setComposingState('composing');
+				} else if (numNotifications === 3) {
+					assert.strictEqual(event.state, 'composing', 'croc1 is composing');
+					session.setComposingState('idle');
+				} else if ( numNotifications === 4) {
+					assert.strictEqual(event.state, 'idle', 'croc1 is idle (forced)');
+					session.close();
+				} else {
+					assert.ok(false, 'Unexpected number of notifications');
+				}
+			};
+			session.onClose = function () {
+				assert.ok(true, "onClose fired");
 				
 				croc1.presence.stop();
 				croc2.presence.stop();
@@ -537,24 +487,66 @@
 		var onReady = function () {
 			if (firstReady) {
 				// Both now connected
-				var iq = new JSJaCIQ();
-				iq.setIQ(config2.address, 'get');
-				iq.setQuery(NS_DISCO);
-				
-				var iqCallBack = function() {
-					assert.ok(true, "IQ call back fired");
+				session = croc1.data.send(config2.address, strData, {
+					type: 'xmpp'
+				});
+				session.onComposingStateChange = function () {
+					assert.ok(false, 'croc2 composing state changed');
 				};
-				croc1.xmppCon.send(iq, iqCallBack);
-				
-				setTimeout(function() {
-					session = croc1.data.send(config2.address, strData, {
-						type: 'xmpp'
-					});
-				}, 2000);
-				
-				setTimeout(function() {
-					assert.strictEqual(session.registerMessageReceipts, true, "expected value for registerMessageReceipts");
-				}, 5000);
+				session.setComposingState('composing');
+			} else {
+				firstReady = true;
+			}
+		};
+
+		croc1.presence.onSelfNotify = onReady;
+		croc2.presence.onSelfNotify = onReady;
+
+		// QUnit will restart once the second croc object has disconnected
+	});
+	
+	QUnit.asyncTest("XMPP send with delivery receipts", 1, function(assert) {
+		var croc1 = $.croc(config1);
+		var croc2 = $.croc(config2);
+		var firstReady = false;
+		var strData = 'XMPP test message ' + new Date();
+		var hungTimerId = setTimeout(function() {
+			assert.ok(false, 'Aborting hung test');
+			croc1.presence.stop();
+			croc2.presence.stop();
+			hungTimerId = null;
+		}, 6000);
+		
+		croc1.presence.start();
+		croc2.presence.start();
+
+		croc1.presence.onDisconnected = function () {
+			// Make sure we're stopped
+			this.stop();
+		};
+		croc2.presence.onDisconnected = function () {
+			// Make sure we're stopped
+			this.stop();
+			if (hungTimerId) {
+				clearTimeout(hungTimerId);
+				hungTimerId = null;
+			}
+			QUnit.start();
+		};
+		
+		var onReady = function () {
+			if (firstReady) {
+				// Both now connected
+				session = croc1.data.send(config2.address, strData, {
+					type: 'xmpp',
+					onSuccess: function () {
+						assert.ok(true, "xmpp onSuccess fired");
+						croc1.presence.stop();
+						croc2.presence.stop();
+						clearTimeout(hungTimerId);
+						hungTimerId = null;
+					}
+				});
 			} else {
 				firstReady = true;
 			}

@@ -1,84 +1,43 @@
 (function(CrocSDK) {
-	
-	// Global variables
-	var NS_CHATSTATES = 'http://jabber.org/protocol/chatstates';
-	var NS_IM_ISCOMPOSING = 'urn:ietf:params:xml:ns:im-iscomposing';
-	var NS_SCHEMA_INSTANCE = 'http://www.w3.org/2001/XMLSchema-instance';
-	var NS_SCHEMA_LOCATION = 'urn:ietf:params:xml:ns:im-composing iscomposing.xsd';
-	var NS_DISCO = 'http://jabber.org/protocol/disco#info';
-	var NS_RECEIPTS = 'urn:xmpp:receipts';
-	var refreshActiveComposingState = null;
-	var timeoutBackToIdle = null;
-	var countComposingSend = 0;
-	var refreshReceivedState = null;
-	var registerMessageReceipts = false;
-	var notificationState = {
-			ACTIVE: 'active',
-			IDLE: 'idle'
-	};
-	var composingState = {
-		CLOSED : 'gone',
-		COMPOSING: 'composing'
-	};
-
 	/**
 	 * Send data to address via page mode.
 	 * 
 	 * @private
-	 * @param {CrocSDK.DataAPI}
-	 *            dataApi
-	 * @param {String}
-	 *            address
-	 * @param {String}
-	 *            data
-	 * @param {Object}
-	 *            [sendConfig]
+	 * @param {CrocSDK.DataAPI} dataApi
+	 * @param {String} address
+	 * @param {String} data
+	 * @param {Object} [sendConfig]
+	 * @returns {DataSession}
 	 */
 	function pageSend(dataApi, address, data, sendConfig) {
-		var options = {
-			eventHandlers : {}
-		};
+		var session = dataApi.sipDataSessions[address];
 
-		if (sendConfig.customHeaders) {
-			// Take properties of object and push into options.extraHeaders
-			options.extraHeaders = [];
-			for ( var header in sendConfig.customHeaders) {
-				if (header.slice(0, 2) !== 'X-') {
-					console.warn("Ignoring invalid header: " + header);
-				} else {
-					options.extraHeaders.push(header + ": " + sendConfig.customHeaders[header]);
-				}
+		if (!session || session.getState === 'closed') {
+			// No suitable session - create a new one
+			session = new CrocSDK.SipDataSession(dataApi, address);
+
+			if (!dataApi.checkSessionsIntervalId) {
+				dataApi.checkSessionsIntervalId = window.setInterval(function() {
+					checkSessions(dataApi);
+				}, 10000);
 			}
-		}
-		if (sendConfig.contentType) {
-			options.contentType = sendConfig.contentType;
-		}
-		if (sendConfig.onSuccess) {
-			options.eventHandlers.succeeded = function() {
-				sendConfig.onSuccess.call(dataApi);
-			};
-		}
-		if (sendConfig.onFailure) {
-			options.eventHandlers.failed = function() {
-				sendConfig.onFailure.call(dataApi);
-			};
+
+			dataApi.sipDataSessions[address] = session;
 		}
 
-		dataApi.crocObject.sipUA.sendMessage(address, data, options);
+		session.send(data, sendConfig);
+		return session;
 	}
+
 	/**
 	 * Send data to address via MSRP.
 	 * 
 	 * @private
-	 * @param {CrocSDK.DataAPI}
-	 *            dataApi
-	 * @param {String}
-	 *            address
-	 * @param {String}
-	 *            data
-	 * @param {Object}
-	 *            [sendConfig]
-	 * @returns {DataSession}
+	 * @param {CrocSDK.DataAPI} dataApi
+	 * @param {String} address
+	 * @param {String} data
+	 * @param {Object} [sendConfig]
+	 * @returns {CrocSDK.MsrpDataSession}
 	 */
 	function msrpSend(dataApi, address, data, sendConfig) {
 		var session = null;
@@ -104,15 +63,6 @@
 			}
 			dataApi.msrpDataSessions.push(session);
 		}
-		
-		session.refreshActiveComposingState = refreshActiveComposingState;
-		session.timeoutBackToIdle = timeoutBackToIdle;
-		session.countComposingSend = countComposingSend;
-		
-		if (refreshActiveComposingState || timeoutBackToIdle) {
-			clearInterval(refreshActiveComposingState);
-			clearTimeout(timeoutBackToIdle);
-		}
 
 		return session;
 	}
@@ -121,18 +71,13 @@
 	 * Send data to address via XMPP.
 	 * 
 	 * @private
-	 * @param {CrocSDK.DataAPI}
-	 *            dataApi
-	 * @param {String}
-	 *            address
-	 * @param {String}
-	 *            data
-	 * @param {Object}
-	 *            [sendConfig]
-	 * @param {String} state
+	 * @param {CrocSDK.DataAPI} dataApi
+	 * @param {String} address
+	 * @param {String} data
+	 * @param {Object} [sendConfig]
 	 * @returns {DataSession}
 	 */
-	function xmppSend(dataApi, address, data, sendConfig, state) {
+	function xmppSend(dataApi, address, data, sendConfig) {
 		var croc = dataApi.crocObject;
 		var xmppCon = croc.xmppCon;
 
@@ -148,7 +93,7 @@
 			throw new TypeError('Unexpected address:', address);
 		}
 		if (!CrocSDK.Util.isType(data, 'string') &&
-				sendConfig.contentType !== 'application/xhtml+xml') {
+				sendConfig.contentType !== CrocSDK.C.MT.XHTML) {
 			throw new TypeError('Unexpected data:', data);
 		}
 
@@ -164,21 +109,8 @@
 				}, 10000);
 			}
 		}
-		
-		if (state) {
-			
-			dataSession.refreshActiveComposingState = refreshActiveComposingState;
-			dataSession.timeoutBackToIdle = timeoutBackToIdle;
-			dataSession.countComposingSend = countComposingSend;
-			dataSession.registerMessageReceipts = registerMessageReceipts;
-			
-			if (refreshActiveComposingState || timeoutBackToIdle) {
-				clearInterval(refreshActiveComposingState);
-				clearTimeout(timeoutBackToIdle);
-			}
-			
-			dataSession.setComposingState(state);
-		} else if (sendConfig.contentType === 'application/xhtml+xml') {
+
+		if (sendConfig.contentType === CrocSDK.C.MT.XHTML) {
 			dataSession.sendXHTML(data, sendConfig);
 		} else {
 			dataSession.send(data, sendConfig);
@@ -191,16 +123,16 @@
 	 * and exceed the idle timeout period; the session will be closed.
 	 * 
 	 * @private
-	 * @param {CrocSDK.DataAPI}
-	 *            dataApi
+	 * @param {CrocSDK.DataAPI} dataApi
 	 */
 	function checkSessions(dataApi) {
-		var idleThreshold = Date.now() - (dataApi.idleTimeout * 1000);
 		var i = 0;
+		var session;
+		var idleThreshold = Date.now() - (dataApi.idleTimeout * 1000);
 		var msrpSessions = dataApi.msrpDataSessions;
 		var xmppSessions = dataApi.xmppDataSessions;
-		var session;
-		var xmppSessionsRemain = false;
+		var sipSessions = dataApi.sipDataSessions;
+		var sessionsActive = false;
 
 		while (i < msrpSessions.length) {
 			session = msrpSessions[i];
@@ -222,23 +154,27 @@
 				i++;
 			}
 		}
-		
-		for (var address in xmppSessions) {
-			session = xmppSessions[address];
 
-			if (session.lastActivity < idleThreshold) {
-				console.log('Closing idle session:', session);
-				session.close();
-			}
+		var sessionMaps = [xmppSessions, sipSessions];
+		for (i = 0; i < sessionMaps.length; i++) {
+			var sessionMap = sessionMaps[i];
+			for (var address in sessionMap) {
+				session = sessionMap[address];
 
-			if (session.getState() === 'closed') {
-				delete xmppSessions[address];
-			} else {
-				xmppSessionsRemain = true;
+				if (session.lastActivity < idleThreshold) {
+					console.log('Closing idle session:', session);
+					session.close();
+				}
+
+				if (session.getState() === 'closed') {
+					delete sessionMap[address];
+				} else {
+					sessionsActive = true;
+				}
 			}
 		}
 
-		if (msrpSessions.length < 1 && !xmppSessionsRemain) {
+		if (msrpSessions.length < 1 && !sessionsActive) {
 			window.clearInterval(dataApi.checkSessionsIntervalId);
 			dataApi.checkSessionsIntervalId = null;
 		}
@@ -355,6 +291,7 @@
 		this.reusableMsrpDataSessions = {};
 		this.msrpDataSessions = [];
 		this.xmppDataSessions = {};
+		this.sipDataSessions = {};
 		this.initMsrp(config);
 	};
 
@@ -374,56 +311,7 @@
 		if (xmppCon) {
 			// Process incoming XMPP message stanzas
 			xmppCon.registerHandler('message', this._handleXmppMessage.bind(this));
-			// Process incoming XMPP IQ stanzas with service discovery info name space
-			xmppCon.registerHandler('iq', 'query', NS_DISCO, 'get', this._handleServiceDisco.bind(this));
 		}
-	};
-	
-	/**
-	 * <p>
-	 * Creates the XML body of a composing state message.
-	 * </p>
-	 * 
-	 * @private
-	 * @param {String} state The current state of message composition.
-	 * @param {String|Number} refresh The refresh period for state messages.
-	 * @returns {Document} doc The XML body to send
-	 */
-	CrocSDK.DataAPI.prototype._createIsComposingXML = function(state, refreshInterval) {
-		var isComposingElem, stateElem, stateTextNode, refreshElem, refreshTextNode;
-
-		var doc = document.implementation.createDocument("", "", null);
-		
-		if (CrocSDK.Util.isType(refreshInterval, 'number')) {
-			refreshInterval = String(refreshInterval);
-		}
-		
-		isComposingElem = doc.createElement("isComposing");
-		isComposingElem.setAttribute("xmlns", NS_IM_ISCOMPOSING);
-		isComposingElem.setAttribute("xmlns:xsi", NS_SCHEMA_INSTANCE);
-		isComposingElem.setAttribute("xsi:schemaLocation", NS_SCHEMA_LOCATION);
-		
-		stateElem = doc.createElement("state");
-		stateTextNode = doc.createTextNode(notificationState.ACTIVE);
-		if (state) {
-			stateTextNode = doc.createTextNode(state);
-		}
-		stateElem.appendChild(stateTextNode);
-		isComposingElem.appendChild(stateElem);
-		
-		if (refreshInterval && state === composingState.COMPOSING) {
-			refreshElem = doc.createElement("refresh");
-			refreshTextNode = doc.createTextNode(refreshInterval);
-			refreshElem.appendChild(refreshTextNode);
-			isComposingElem.appendChild(refreshElem);
-		}
-		
-		doc.appendChild(isComposingElem);
-		
-		var xmlSerializer = new XMLSerializer();
-		var serailizedXML = xmlSerializer.serializeToString(doc);
-		
-		return serailizedXML;
 	};
 
 	/**
@@ -534,65 +422,29 @@
 		var request = event.data.request;
 		var address = request.parseHeader('from', 0).uri.toAor().replace(/^sip:/, '');
 		var contentType = request.headers['Content-Type'][0].parsed;
+		var dataSession = this.xmppDataSessions[address];
 
-		if (contentType === 'application/im-iscomposing+xml' &&
-				this.hasOwnProperty('onComposingStateChange')) {
-			
-			var domParser = new DOMParser();
-			var bodyToXML = domParser.parseFromString(request.body, "text/xml");
-			
-			var stateElem = bodyToXML.getElementsByTagName("state")[0];
-			var stateElemChild = stateElem.childNodes[0];
-			var state = stateElemChild.nodeValue;
-			
-			var refreshElem = bodyToXML.getElementsByTagName("refresh")[0];
-			var refreshElemChild = refreshElem.childNodes[0];
-			
-			/* RFC 3994: "refresh element is expressed in integer seconds" 
-			 * Switch back to milliseconds for timer.*/
-			var refreshInterval = parseInt(refreshElemChild.nodeValue, 10) * 1000;
-			
-			switch (state) {
-			case notificationState.IDLE:
-				
-				CrocSDK.Util.fireEvent(this, 'onComposingStateChange', {
-					state: state
-				});
-				break;
-			case notificationState.ACTIVE:
-				
-				clearInterval(refreshReceivedState);
-				
-				refreshReceivedState = setInterval(function() {
-					CrocSDK.Util.fireEvent(this, 'onComposingStateChange', {
-						state: notificationState.IDLE
-					});
-				}, refreshInterval);
-				
-				CrocSDK.Util.fireEvent(this, 'onComposingStateChange', {
-					state: composingState.COMPOSING
-				});
-				break;
-			default:
-				throw new CrocSDK.Exceptions.ValueError('Received incorrect state value:' + state);
+		if (!dataSession || dataSession.getState() === 'closed') {
+			// Create a new data session
+			dataSession = new CrocSDK.SipDataSession(this, address);
+			this.sipDataSessions[address] = dataSession;
+
+			if (!this.checkSessionsIntervalId) {
+				var dataApi = this;
+				this.checkSessionsIntervalId = window.setInterval(function() {
+					checkSessions(dataApi);
+				}, 10000);
 			}
-			
 
-		} else if (contentType === 'application/xhtml+xml' &&
-				this.hasOwnProperty('onXHTMLReceived')) {
-			
-			CrocSDK.Util.fireEvent(this, 'onXHTMLReceived', {
-				address: address,
-				body: CrocSDK.Util.extractXHTMLBody(request.body)
-			});
-		} else {
-			
-			CrocSDK.Util.fireEvent(this, 'onData', {
-				address : address,
-				contentType : contentType,
-				data : request.body
+			CrocSDK.Util.fireEvent(this, 'onDataSession', {
+				session: dataSession,
+				fileTransfer: null
 			});
 		}
+
+		// Let the session handle the rest
+		dataSession._receiveMessage(address, contentType, request.body);
+		event.data.message.accept();
 	};
 
 	/**
@@ -605,7 +457,7 @@
 		var uniqueAddress = message.getFrom();
 		var address = message.getFromJID().getBareJID();
 		var dataSession = this.xmppDataSessions[address];
-		
+
 		if (dataSession && dataSession.getState() !== 'closed') {
 			// Existing data session
 			// "Lock in" on full JID (see RFC 6121 section 5.1)
@@ -628,30 +480,9 @@
 				fileTransfer: null
 			});
 		}
-		
+
 		// Let the session handle the rest
 		dataSession._receiveMessage(message);
-	};
-	
-	/**
-	 * Handles incoming XMPP iq stanzas.
-	 * 
-	 * @private
-	 * @param {JSJaCIQ} iq
-	 */
-	CrocSDK.DataAPI.prototype._handleServiceDisco = function (iq) {
-		var response = new JSJaCIQ();
-		response.setIQ(iq.getFrom(), 'result', iq.getID());
-		
-		var featureNodeReceipts = response.buildNode('feature', {'var': NS_RECEIPTS});
-		var festureNodeChat = response.buildNode('feature', {'var': NS_CHATSTATES});
-		
-		var queryNode = response.buildNode('query', {xmlns: NS_DISCO},
-				[featureNodeReceipts, festureNodeChat]);
-		response.appendNode(queryNode);
-		
-		var isSent = this.crocObject.xmppCon.send(response);
-		registerMessageReceipts = isSent;
 	};
 
 	/*
@@ -680,7 +511,6 @@
 	 * @throws {CrocSDK.Exceptions#StateError}
 	 */
 	CrocSDK.DataAPI.prototype.send = function(address, data, sendConfig) {
-		
 		sendConfig = sendConfig || {};
 		CrocSDK.Util.checkSendConfig(sendConfig);
 
@@ -733,7 +563,7 @@
 			sendConfig.type = 'page';
 		}
 
-		sendConfig.contentType = 'application/xhtml+xml';
+		sendConfig.contentType = CrocSDK.C.MT.XHTML;
 		if (sendConfig.type !== 'xmpp') {
 			xhtml = CrocSDK.Util.createValidXHTMLDoc(body);
 		}
@@ -749,129 +579,6 @@
 		default:
 			throw new CrocSDK.Exceptions.ValueError(
 					"Invalid type value");
-		}
-	};
-	
-	/**
-	 * <p>
-	 * Send a state message to <code>address</code>.
-	 * </p>
-	 * <p>
-	 * Returns the session used for the send.  This can be ignored if you want
-	 * to let the SDK handle session management.
-	 * </p>
-	 * 
-	 * @memberof CrocSDK.DataAPI
-	 * @param {string} address - The destination address.
-	 * @param {DocumentFragment|string} body - The body of the message.
-	 * @param {CrocSDK.DataAPI~SendConfig} [sendConfig] - Optional extra
-	 * configuration that can be provided when sending data.  If this object is
-	 * omitted, the defaults will be used.
-	 * @param {String} state the state of chat notifications. Can be set to 
-	 * <code>idle</code> or <code>composing</code>.
-	 * @returns {CrocSDK.MsrpDataSession} DataSession
-	 * @throws {TypeError}
-	 * @throws {CrocSDK.Exceptions#ValueError}
-	 * @throws {CrocSDK.Exceptions#VersionError}
-	 * @throws {CrocSDK.Exceptions#StateError}
-	 */
-	CrocSDK.DataAPI.prototype.setComposingState = function(address, body, sendConfig, state) {
-		var xml;
-		var refreshInterval  = this.idleTimeout / 2 * 1000;
-		
-		sendConfig = sendConfig || {};
-		CrocSDK.Util.checkSendConfig(sendConfig);
-
-		// Use appropriate session type if specified
-		if (!sendConfig.type) {
-			// TODO: make intelligent selection of default transport
-			sendConfig.type = 'page';
-		}
-		
-		if (state === notificationState.IDLE) {
-			
-			countComposingSend = 0;
-			
-			if (sendConfig.type !== 'xmpp') {
-				sendConfig.contentType = 'application/im-iscomposing+xml';
-				
-				xml = this._createIsComposingXML(state);
-			}
-			
-			if (timeoutBackToIdle) {
-				clearTimeout(timeoutBackToIdle);
-			}
-			
-			// Send idle state message
-			switch (sendConfig.type) {
-			case 'msrp':
-				return msrpSend(this, address, xml, sendConfig);
-			case 'page':
-				return pageSend(this, address, xml, sendConfig);
-			case 'xmpp':
-				// XMPP is handled differently; just pass through what we've been given
-				return xmppSend(this, address, body, sendConfig, state);
-			default:
-				throw new CrocSDK.Exceptions.ValueError(
-						"Invalid type value");
-			}
-		}
-		
-		if (state === composingState.COMPOSING) {
-			
-			if (sendConfig.type !== 'xmpp') {
-				sendConfig.contentType = 'application/im-iscomposing+xml';
-				
-				// RFC 3994 states refresh element is expressed in integer seconds
-				var refreshElemInterval = refreshInterval / 1000;
-				xml = this._createIsComposingXML(notificationState.ACTIVE, refreshElemInterval);
-			}
-			
-			if (timeoutBackToIdle) {
-				clearTimeout(timeoutBackToIdle);
-			}
-			
-			timeoutBackToIdle = setTimeout(function() {
-				this.setComposingState(address, body, sendConfig, notificationState.IDLE);
-			}, 15000);
-			
-			if (countComposingSend < 1) {
-				if (refreshActiveComposingState) {
-					clearInterval(refreshActiveComposingState);
-				}
-				
-				refreshActiveComposingState = setInterval(function() {
-					// Send another composing message
-					switch (sendConfig.type) {
-					case 'msrp':
-						return msrpSend(this, address, xml, sendConfig);
-					case 'page':
-						return pageSend(this, address, xml, sendConfig);
-					case 'xmpp':
-						// XMPP is handled differently; just pass through what we've been given
-						return xmppSend(this, address, body, sendConfig, state);
-					default:
-						throw new CrocSDK.Exceptions.ValueError(
-								"Invalid type value");
-					}
-				}, refreshInterval);
-				
-				// Send first composing message
-				switch (sendConfig.type) {
-				case 'msrp':
-					return msrpSend(this, address, xml, sendConfig);
-				case 'page':
-					return pageSend(this, address, xml, sendConfig);
-				case 'xmpp':
-					// XMPP is handled differently; just pass through what we've been given
-					return xmppSend(this, address, body, sendConfig, state);
-				default:
-					throw new CrocSDK.Exceptions.ValueError(
-							"Invalid type value");
-				}
-				// Count first send
-				countComposingSend++;
-			}
 		}
 	};
 

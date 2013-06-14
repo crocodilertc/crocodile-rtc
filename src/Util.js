@@ -260,4 +260,27 @@
 		return df;
 	};
 
+	var rfc3994StateToSdkState = {
+		'active': 'composing',
+		'idle': 'idle'
+	};
+	
+	CrocSDK.Util.rfc3994StateToSdkState = function (rfc3994State) {
+		return rfc3994StateToSdkState[rfc3994State];
+	};
+
+	CrocSDK.Util.createIsComposingXml = function (sdkState, refresh) {
+		var xml = '<isComposing xmlns="urn:ietf:params:xml:ns:im-iscomposing">';
+		var state;
+		if (sdkState === 'composing') {
+			state = 'active';
+		} else {
+			state = 'idle';
+		}
+		xml = xml.concat('<state>', state, '</state>');
+		if (refresh) {
+			xml = xml.concat('<refresh>', refresh, '</refresh>');
+		}
+		return xml + '</isComposing>';
+	};
 }(CrocSDK));

@@ -26,6 +26,8 @@
 	"ERR_FEATURE_NOT_IMPLEMENTED": false,
 	"ERR_BAD_REQUEST": false,
 	"NS_ROSTER": false,
-	"NS_STANZAS": false
+	"NS_STANZAS": false,
+	"NS_DISCO_INFO": false,
+	"NS_CHAT_STATES": false
   }
 }

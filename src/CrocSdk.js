@@ -1206,7 +1206,6 @@ var CrocSDK = {};
 	 * @memberof CrocSDK.Croc
 	 * @typedef CrocSDK.Croc~OnRegistrationFailedEvent
 	 * @property {String} cause The message stating why the registration 
-	 * @property {String} cause The message stating why the registration 
 	 * process failed.
 	 */
 

@@ -1123,59 +1123,54 @@
 		});
 	});
 	
-	QUnit.asyncTest("Send status message", 7, function(assert) {
+	QUnit.asyncTest("Composing state", 5, function(assert) {
 		var croc1 = $.croc(config1);
 		var croc2 = $.croc(config2);
 		var croc2Session = null;
-		var state = 'idle';
 		// Give up if the test has hung for too long
 		var hungTimerId = setTimeout(function() {
 			assert.ok(false, 'Aborting hung test');
 			croc1.disconnect();
 			croc2.disconnect();
-		}, 10000);
-
-		var testContentType = 'application/im-iscomposing+xml';
+		}, 30000);
+		var numNotifications = 0;
 
 		// Set up the receiver's event handlers
 		croc2.data.onDataSession = function (event) {
-			event.session.accept();
-			
-			event.session.onComposingStateChange = function(event) {
-				assert.ok(true, 'onComposingStateChange fired for croc2');
-				assert.strictEqual(event.state, 'idle', "expected value of state for croc2");
-			};
-			
 			croc2Session = event.session;
-		};
-
-		croc1.data.onComposingStateChange = function (event) {
-			assert.ok(true, 'onComposingStateChange fired for croc 1');
-			
-			// Check event object properties
-			assert.strictEqual(event.state, state, 'Event state correct');
+			croc2Session.accept();
+			croc2Session.onData = function () {
+				croc2Session.setComposingState('composing');
+			};
 		};
 
 		// Wait for receiver to register before sending the data
 		croc2.sipUA.on('registered', function () {
-			var session = croc1.data.setComposingState(config2.address, strData, {
-				type: 'msrp',
-				contentType: testContentType,
-				onSuccess: function () {
-					assert.ok(true, 'TransferProgress.onSuccess event fired');
-					
-					croc2Session.setComposingState({
-						type: 'msrp',
-						contentType: testContentType,
-						onSuccess: function () {
-							assert.ok(true, 'TransferProgress.onSuccess event fired');
-							
-							// Successful send - close the session
-							this.session.close();
-						}
-					}, state);
+			var session = croc1.data.send(config2.address, strData, {
+				type: 'msrp'
+			});
+
+			session.onComposingStateChange = function (event) {
+				numNotifications++;
+				if (numNotifications === 1) {
+					assert.strictEqual(event.state, 'composing', 'croc2 is composing');
+					idleTimerId = setTimeout(function () {
+						assert.ok(false, 'No idle notification');
+					}, 16000);
+				} else if (numNotifications === 2) {
+					clearTimeout(idleTimerId);
+					assert.strictEqual(event.state, 'idle', 'croc2 is idle (timeout)');
+					croc2Session.setComposingState('composing');
+				} else if (numNotifications === 3) {
+					assert.strictEqual(event.state, 'composing', 'croc2 is composing');
+					croc2Session.setComposingState('idle');
+				} else if ( numNotifications === 4) {
+					assert.strictEqual(event.state, 'idle', 'croc2 is idle (forced)');
+					croc2Session.close();
+				} else {
+					assert.ok(false, 'Unexpected number of notifications');
 				}
-			}, state);
+			};
 
 			// Clean up the croc objects when the session closes
 			session.onClose = function () {
