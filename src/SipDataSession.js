@@ -56,18 +56,22 @@
 			var domParser = new DOMParser();
 			var doc = domParser.parseFromString(body, contentType);
 			var state = doc.getElementsByTagName("state")[0].firstChild.data;
-			var refresh = doc.getElementsByTagName("refresh")[0].firstChild.data;
-			refresh = parseInt(refresh, 10);
 
 			var sdkState = CrocSDK.Util.rfc3994StateToSdkState(state);
 			if (sdkState === CrocSDK.C.states.sdkComposing.COMPOSING) {
+				var refreshTimeout = 120;
+				var refreshNode = doc.getElementsByTagName("refresh")[0];
+				if (refreshNode) {
+					refreshTimeout = parseInt(refreshNode.firstChild.data, 10);
+					refreshTimeout = refreshTimeout * 1.1;
+				}
 				// Start timeout for remote active refresh
 				var session = this;
 				this.remoteActiveTimeoutId = setTimeout(function() {
 					CrocSDK.Util.fireEvent(session, 'onComposingStateChange', {
 						state: CrocSDK.C.states.sdkComposing.IDLE
 					});
-				}, (refresh * 1.1) * 1000);
+				}, refreshTimeout * 1000);
 			}
 
 			if (sdkState !== prevSdkState) {

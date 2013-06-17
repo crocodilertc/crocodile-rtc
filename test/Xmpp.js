@@ -653,8 +653,10 @@
 					assert.ok(true, 'onFailure fired');
 
 					croc1.presence.stop();
-					clearTimeout(hungTimerId);
-					hungTimerId = null;
+					if (hungTimerId) {
+						clearTimeout(hungTimerId);
+						hungTimerId = null;
+					}
 				}
 			});
 		};

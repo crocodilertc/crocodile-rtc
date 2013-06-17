@@ -1175,7 +1175,10 @@
 			// Clean up the croc objects when the session closes
 			session.onClose = function () {
 				assert.ok(true, 'DataSession.onClose event fired');
-				clearTimeout(hungTimerId);
+				if (hungTimerId) {
+					clearTimeout(hungTimerId);
+					hungTimerId = null;
+				}
 				croc1.disconnect();
 				croc2.disconnect();
 			};
@@ -1238,7 +1241,10 @@
 			// Clean up the croc objects when the session closes
 			session.onClose = function () {
 				assert.ok(true, 'DataSession.onClose event fired');
-				clearTimeout(hungTimerId);
+				if (hungTimerId) {
+					clearTimeout(hungTimerId);
+					hungTimerId = null;
+				}
 				croc1.disconnect();
 				croc2.disconnect();
 			};

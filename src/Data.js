@@ -11,10 +11,15 @@
 	 */
 	function pageSend(dataApi, address, data, sendConfig) {
 		var session = dataApi.sipDataSessions[address];
+		var capabilityApi = dataApi.crocObject.capability;
 
 		if (!session || session.getState === 'closed') {
 			// No suitable session - create a new one
 			session = new CrocSDK.SipDataSession(dataApi, address);
+
+			// Start with cached capabilities if we have them
+			session.capabilities = capabilityApi.getCapabilities(address);
+			session.customHeaders = sendConfig.customHeaders || {};
 
 			if (!dataApi.checkSessionsIntervalId) {
 				dataApi.checkSessionsIntervalId = window.setInterval(function() {
@@ -424,12 +429,24 @@
 		var request = event.data.request;
 		var address = request.parseHeader('from', 0).uri.toAor().replace(/^sip:/, '');
 		var contentType = request.headers['Content-Type'][0].parsed;
-		var dataSession = this.xmppDataSessions[address];
+		var dataSession = this.sipDataSessions[address];
+		var parsedContactHeader = request.parseHeader('contact', 0);
+		var caps = null;
+		if (parsedContactHeader) {
+			caps = this.crocObject.capability.parseFeatureTags(
+					parsedContactHeader.parameters);
+		}
+		var displayName = request.from.display_name;
 
 		if (!dataSession || dataSession.getState() === 'closed') {
 			// Create a new data session
 			dataSession = new CrocSDK.SipDataSession(this, address);
 			this.sipDataSessions[address] = dataSession;
+
+			// Set the new session properties
+			dataSession.capabilities = caps;
+			dataSession.customHeaders = CrocSDK.Util.getCustomHeaders(request);
+			dataSession.displayName = displayName;
 
 			if (!this.checkSessionsIntervalId) {
 				var dataApi = this;
@@ -438,15 +455,39 @@
 				}, 10000);
 			}
 
+			// If the session is immediately closed, reject the message.
+			// Do this by setting a temporary close() method, overriding the
+			// prototype method.
+			var rejected = false;
+			dataSession.close = function () {
+				rejected = true;
+			};
+
 			CrocSDK.Util.fireEvent(this, 'onDataSession', {
 				session: dataSession,
 				fileTransfer: null
 			});
+
+			// Remove the temporary close method
+			delete dataSession.close;
+
+			if (rejected) {
+				event.data.message.reject();
+				// Call the real close method
+				dataSession.close();
+				return;
+			} else {
+				event.data.message.accept();
+			}
+		} else {
+			// Update session properties
+			dataSession.capabilities = caps;
+			dataSession.customHeaders = CrocSDK.Util.getCustomHeaders(request);
+			dataSession.displayName = displayName;
 		}
 
 		// Let the session handle the rest
 		dataSession._receiveMessage(address, contentType, request.body);
-		event.data.message.accept();
 	};
 
 	/**
@@ -504,7 +545,7 @@
 			// Let the session handle the rest
 			dataSession._receiveMessageError(message);
 		} else {
-			console.warn('Unexpected XMPP error: ', message);
+			console.log('Unhandled XMPP error: ', message.xml());
 		}
 
 		return true;

@@ -188,5 +188,123 @@
 		// QUnit will restart once the second croc object has disconnected
 	});
 
+	QUnit.asyncTest("Test rejecting message", 5, function(assert) {
+		var croc1 = $.croc(config1);
+		var croc2 = $.croc(config2);
+		// Give up if the test has hung for too long
+		var hungTimerId = setTimeout(function() {
+			assert.ok(false, 'Aborting hung test');
+			croc1.disconnect();
+			croc2.disconnect();
+			hungTimerId = null;
+		}, 10000);
+		// Have to specify NS to satisfy equality assertion
+		var strData = '<strong xmlns="http://www.w3.org/1999/xhtml">XMPP test message</strong> ' + new Date();
+		var testCustomHeaders = {
+				"X-Foo": 'bar',
+				"X-Test-.!%*+`'~0123456789": 'Yee-ha!'
+		};
+
+		croc2.data.onDataSession = function(event) {
+			assert.ok(true, 'onDataSession event fired');
+			// Check session properties
+			var session = event.session;
+			assert.strictEqual(session.address, config1.address, 
+					'Incoming session address correct');
+			assert.strictEqual(session.displayName, config1.displayName,
+					'Incoming session displayName correct');
+			assert.deepEqual(session.customHeaders, testCustomHeaders, 
+					'Incoming session customHeaders correct');
+			session.close();
+		};
+
+		// Wait for receiver to register before sending the data
+		croc2.sipUA.on('registered', function () {
+			croc1.data.send(config2.address, strData, {
+				type: 'page',
+				customHeaders: testCustomHeaders,
+				onSuccess: function () {
+					assert.ok(false, 'Message accepted');
+				},
+				onFailure: function () {
+					assert.ok(true, 'Message rejected');
+
+					if (hungTimerId) {
+						clearTimeout(hungTimerId);
+						hungTimerId = null;
+					}
+					croc1.disconnect();
+					croc2.disconnect();
+				}
+			});
+		});
+		// QUnit will restart once the second croc object has disconnected
+	});
+
+	QUnit.asyncTest("Test composing notifications", 5, function(assert) {
+		var croc1 = $.croc(config1);
+		var croc2 = $.croc(config2);
+		// Give up if the test has hung for too long
+		var hungTimerId = setTimeout(function() {
+			assert.ok(false, 'Aborting hung test');
+			croc1.disconnect();
+			croc2.disconnect();
+			hungTimerId = null;
+		}, 30000);
+		// Have to specify NS to satisfy equality assertion
+		var strData = 'blah blah blah' + new Date();
+		var croc2Session = null;
+		var numNotifications = 0;
+
+		croc2.data.onDataSession = function(event) {
+			croc2Session = event.session;
+			croc2Session.accept();
+			croc2Session.onData = function () {
+				croc2Session.setComposingState('composing');
+			};
+		};
+
+		// Wait for receiver to register before sending the data
+		croc2.sipUA.on('registered', function () {
+			var session = croc1.data.send(config2.address, strData, {
+				type: 'page',
+			});
+
+			session.onComposingStateChange = function (event) {
+				numNotifications++;
+				if (numNotifications === 1) {
+					assert.strictEqual(event.state, 'composing', 'croc2 is composing');
+					idleTimerId = setTimeout(function () {
+						assert.ok(false, 'No idle notification');
+					}, 16000);
+				} else if (numNotifications === 2) {
+					clearTimeout(idleTimerId);
+					assert.strictEqual(event.state, 'idle', 'croc2 is idle (timeout)');
+					croc2Session.setComposingState('composing');
+				} else if (numNotifications === 3) {
+					assert.strictEqual(event.state, 'composing', 'croc2 is composing');
+					croc2Session.setComposingState('idle');
+				} else if ( numNotifications === 4) {
+					assert.strictEqual(event.state, 'idle', 'croc2 is idle (forced)');
+					session.close();
+				} else {
+					assert.ok(false, 'Unexpected number of notifications');
+				}
+			};
+
+			// Clean up the croc objects when the session closes
+			session.onClose = function () {
+				assert.ok(true, 'DataSession.onClose event fired');
+				if (hungTimerId) {
+					clearTimeout(hungTimerId);
+					hungTimerId = null;
+				}
+				croc1.disconnect();
+				croc2.disconnect();
+			};
+		});
+		// QUnit will restart once the second croc object has disconnected
+	});
+
 	// For data.onDataSession, data.close and msrp data.send; tests are run on test module 'MSRP Data Sessions'
 }(jQuery));
