@@ -25,14 +25,16 @@
 		address: testUsers[0].address,
 		password: testUsers[0].password,
 		displayName: 'Unit Tester #1',
-		start: false
+		start: false,
+		xmppResource : 'unittest'
 	};
 	var config2 = {
 		apiKey: testApiKey,
 		address: testUsers[1].address,
 		password: testUsers[1].password,
 		displayName: 'Unit Tester #2',
-		start: false
+		start: false,
+		xmppResource : 'unittest'
 	};
 	
 	function removeExistingContacts(contacts) {
@@ -662,6 +664,87 @@
 		};
 
 		croc1.presence.onSelfNotify = onReady;
+
+		// QUnit will restart once the second croc object has disconnected
+	});
+
+	QUnit.asyncTest("Service discovery response", 7, function(assert) {
+		var croc1 = $.croc(config1);
+		var croc2 = $.croc(config2);
+		var firstReady = false;
+		// Give up if the test has hung for too long
+		var hungTimerId = setTimeout(function() {
+			assert.ok(false, 'Aborting hung test');
+			croc1.presence.stop();
+			croc2.presence.stop();
+			hungTimerId = null;
+		}, 10000);
+
+		croc1.presence.start();
+		croc2.presence.start();
+
+		croc1.presence.onDisconnected = function () {
+			// Make sure we're stopped
+			this.stop();
+		};
+		croc2.presence.onDisconnected = function () {
+			// Make sure we're stopped
+			this.stop();
+			if (hungTimerId) {
+				clearTimeout(hungTimerId);
+				hungTimerId = null;
+			}
+			QUnit.start();
+		};
+
+		var onReady = function () {
+			if (firstReady) {
+				// Both now connected
+				// Not a supported API, internal testing only
+				var iq = new JSJaCIQ();
+				iq.setIQ(config2.address + '/' + config2.xmppResource, 'get', null);
+				iq.setQuery('http://jabber.org/protocol/disco#info');
+				croc1.xmppCon.send(iq, function (response) {
+					assert.ok(true, 'Received response');
+					assert.strictEqual(response.getType(), 'result', 'Expected type');
+					var queryNode = response.getQuery();
+					if (queryNode) {
+						assert.strictEqual(queryNode.namespaceURI,
+								'http://jabber.org/protocol/disco#info',
+								'Expected query NS');
+						var childNodes = queryNode.childNodes;
+						var features= [];
+						var unexpectedChild = false;
+						for (var i = 0, len = childNodes.length; i < len; i++) {
+							var child = childNodes.item(i);
+							if (child.tagName === 'feature') {
+								features.push(child.getAttribute('var'));
+							} else {
+								unexpectedChild = true;
+							}
+						}
+						assert.strictEqual(unexpectedChild, false, 'No unexpected child nodes');
+						assert.ok(features.indexOf('urn:xmpp:receipts') !== -1, 'Supports receipts');
+						assert.ok(features.indexOf(NS_CHAT_STATES) !== -1, 'Supports chat states');
+						assert.ok(features.indexOf('http://jabber.org/protocol/xhtml-im') !== -1, 'Supports XHTML-IM');
+					} else {
+						assert.ok(false, 'No query node');
+					}
+
+					croc1.presence.stop();
+					if (hungTimerId) {
+						clearTimeout(hungTimerId);
+						hungTimerId = null;
+					}
+					QUnit.start();
+				});
+			} else {
+				firstReady = true;
+			}
+		};
+
+		croc1.presence.onSelfNotify = onReady;
+		croc2.presence.onSelfNotify = onReady;
 
 		// QUnit will restart once the second croc object has disconnected
 	});
