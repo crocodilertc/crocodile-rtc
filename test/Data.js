@@ -255,6 +255,7 @@
 		var strData = 'blah blah blah' + new Date();
 		var croc2Session = null;
 		var numNotifications = 0;
+		var idleTimerId = null;
 
 		croc2.data.onDataSession = function(event) {
 			croc2Session = event.session;
@@ -267,7 +268,7 @@
 		// Wait for receiver to register before sending the data
 		croc2.sipUA.on('registered', function () {
 			var session = croc1.data.send(config2.address, strData, {
-				type: 'page',
+				type: 'page'
 			});
 
 			session.onComposingStateChange = function (event) {

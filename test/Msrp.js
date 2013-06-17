@@ -1134,6 +1134,7 @@
 			croc2.disconnect();
 		}, 30000);
 		var numNotifications = 0;
+		var idleTimerId = null;
 
 		// Set up the receiver's event handlers
 		croc2.data.onDataSession = function (event) {

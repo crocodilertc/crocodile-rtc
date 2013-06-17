@@ -539,7 +539,7 @@
 		var onReady = function () {
 			if (firstReady) {
 				// Both now connected
-				session = croc1.data.send(config2.address, strData, {
+				croc1.data.send(config2.address, strData, {
 					type: 'xmpp',
 					onSuccess: function () {
 						assert.ok(true, "xmpp onSuccess fired");
@@ -725,7 +725,7 @@
 						}
 						assert.strictEqual(unexpectedChild, false, 'No unexpected child nodes');
 						assert.ok(features.indexOf('urn:xmpp:receipts') !== -1, 'Supports receipts');
-						assert.ok(features.indexOf(NS_CHAT_STATES) !== -1, 'Supports chat states');
+						assert.ok(features.indexOf('http://jabber.org/protocol/chatstates') !== -1, 'Supports chat states');
 						assert.ok(features.indexOf('http://jabber.org/protocol/xhtml-im') !== -1, 'Supports XHTML-IM');
 					} else {
 						assert.ok(false, 'No query node');
