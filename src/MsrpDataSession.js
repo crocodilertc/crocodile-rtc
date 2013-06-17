@@ -551,6 +551,21 @@
 	};
 
 	/*
+	 * Internal methods
+	 */
+
+	/**
+	 * Checks whether this session should be considered idle, and thus closed
+	 * by the periodic cleanup process.
+	 * @private
+	 * @param {int} idleThreshold - the idle threshold timestamp
+	 * @returns {Boolean} 'true' if the session is currently idle
+	 */
+	MsrpDataSession.prototype._isIdle = function (idleThreshold) {
+		return this.lastActivity < idleThreshold;
+	};
+
+	/*
 	 * Public methods
 	 */
 

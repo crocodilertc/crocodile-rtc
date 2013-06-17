@@ -137,7 +137,7 @@
 		while (i < msrpSessions.length) {
 			session = msrpSessions[i];
 
-			if (session.lastActivity < idleThreshold) {
+			if (session._isIdle(idleThreshold)) {
 				console.log('Closing idle session:', session);
 				session.close();
 			}
@@ -161,7 +161,7 @@
 			for (var address in sessionMap) {
 				session = sessionMap[address];
 
-				if (session.lastActivity < idleThreshold) {
+				if (session._isIdle(idleThreshold)) {
 					console.log('Closing idle session:', session);
 					session.close();
 				}
@@ -596,10 +596,16 @@
 	 * @memberof CrocSDK.DataAPI
 	 */
 	CrocSDK.DataAPI.prototype.close = function() {
+		var address = null;
 		// Close down all MSRP data sessions
-		for ( var i = 0, len = this.msrpDataSessions.length; i < len; i++) {
+		for (var i = 0, len = this.msrpDataSessions.length; i < len; i++) {
 			this.msrpDataSessions[i].close();
 		}
+		// Close down all SIP data sessions
+		for (address in this.sipDataSessions) {
+			this.sipDataSessions[address].close();
+		}
+		// Note: XMPP is tied to presence.stop() instead.
 	};
 
 	/**

@@ -807,11 +807,11 @@
 		} else if (type === 'unavailable') {
 			availability = 'unavailable';
 
-			// "Unlock" any data sessions for this address (see RFC 6121
-			// section 5.1)
+			// Close any data sessions for this address (effectively also
+			// "unlocks" the session, see RFC 6121 section 5.1)
 			var dataSession = this.crocObject.data.xmppDataSessions[bareFrom];
 			if (dataSession && dataSession.uniqueAddress === request.getFrom()) {
-				dataSession._setUniqueAddress(null);
+				dataSession.close();
 			}
 		} else {
 			console.warn('Unexpected presence message', request.xml());
@@ -910,6 +910,12 @@
 		var con = this.crocObject.xmppCon;
 		if (con.connected()) {
 			// Attempt graceful disconnect
+			// Close down all XMPP data sessions
+			var address = null;
+			var xmppDataSessions = this.crocObject.data.xmppDataSessions;
+			for (address in xmppDataSessions) {
+				xmppDataSessions[address].close();
+			}
 			// Send unavailable presence update
 			var presence = new JSJaCPresence();
 			con.send(presence.setType('unavailable'));

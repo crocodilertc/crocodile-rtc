@@ -12,6 +12,8 @@
 		this.supportsReceipts = true;
 		// Chat state timer
 		this.localComposingTimeoutId = null;
+		this.localChatState = CrocSDK.C.states.xmppChatState.ACTIVE;
+		this.remoteChatState = CrocSDK.C.states.xmppChatState.ACTIVE;
 		// Receipt notifications
 		this.outstandingMsgMap = {};
 		this.outstandingMsgs = [];
@@ -131,6 +133,7 @@
 		xmppMsg.setTo(this.uniqueAddress || this.address);
 		xmppMsg.appendNode(xmppMsg.buildNode(xmppChatState, null, null, NS_CHAT_STATES));
 		this.dataApi.crocObject.xmppCon.send(xmppMsg);
+		this.localChatState = xmppChatState;
 	};
 
 	CrocSDK.XmppDataSession.prototype._createReceiptId = function (config) {
@@ -151,6 +154,22 @@
 		}
 
 		return id;
+	};
+
+	/**
+	 * Checks whether this session should be considered idle, and thus closed
+	 * by the periodic cleanup process.
+	 * @private
+	 * @param {int} idleThreshold - the idle threshold timestamp
+	 * @returns {Boolean} 'true' if the session is currently idle
+	 */
+	CrocSDK.XmppDataSession.prototype._isIdle = function (idleThreshold) {
+		// XMPP does not refresh the 'composing' state, so a prolonged message
+		// composition could cause the session to idle-out inappropriately.
+		// To prevent this, check the local and remote composing state as well.
+		return this.localChatState !== CrocSDK.C.states.xmppChatState.COMPOSING &&
+			this.remoteChatState !== CrocSDK.C.states.xmppChatState.COMPOSING &&
+			this.lastActivity < idleThreshold;
 	};
 
 	/*
