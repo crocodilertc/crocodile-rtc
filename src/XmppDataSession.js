@@ -105,12 +105,13 @@
 				});
 			}
 		} else if (receivedNode) {
+			// Process delivery receipt ack
 			var id = receivedNode.getAttribute('id');
 			var config = this.outstandingMsgMap[id];
 			if (config) {
 				CrocSDK.Util.fireEvent(config, 'onSuccess', {});
+				delete this.outstandingMsgMap[id];
 			}
-			delete this.outstandingMsgMap[id];
 		}
 
 		// Check for delivery receipt request
@@ -120,6 +121,20 @@
 					null, CrocSDK.C.NS.XMPP_RECEIPTS));
 			receipt.setTo(message.getFrom());
 			this.dataApi.crocObject.xmppCon.send(receipt);
+		}
+	};
+
+	/**
+	 * Processes an incoming message error for this session.
+	 * @private
+	 * @param {JSJaCMessage} message
+	 */
+	CrocSDK.XmppDataSession.prototype._receiveMessageError = function (message) {
+		var id = message.getID();
+		var config = this.outstandingMsgMap[id];
+		if (config) {
+			CrocSDK.Util.fireEvent(config, 'onFailure', {});
+			delete this.outstandingMsgMap[id];
 		}
 	};
 
@@ -201,14 +216,18 @@
 			xmppMsg.appendNode(xmppMsg.buildNode("active", null, null, NS_CHAT_STATES));
 		}
 
-		if (this.supportsReceipts && config.onSuccess) {
+		if (config.onSuccess || config.onFailure) {
+			// Add an ID so errors/receipts can be associated with this message
 			xmppMsg.setID(this._createReceiptId(config));
-			xmppMsg.appendNode(xmppMsg.buildNode("request", null, null,
-					CrocSDK.C.NS.XMPP_RECEIPTS));
+			if (this.supportsReceipts) {
+				xmppMsg.appendNode(xmppMsg.buildNode("request", null, null,
+						CrocSDK.C.NS.XMPP_RECEIPTS));
+			}
 		}
 
 		if (!this.dataApi.crocObject.xmppCon.send(xmppMsg)) {
 			CrocSDK.Util.fireEvent(config, 'onFailure', {});	
+			delete this.outstandingMsgMap[xmppMsg.getID()];
 		}
 		this.lastActivity = Date.now();
 		if (this.localComposingTimeoutId) {
@@ -255,14 +274,18 @@
 			xmppMsg.appendNode(xmppMsg.buildNode("active", null, null, NS_CHAT_STATES));
 		}
 
-		if (this.supportsReceipts) {
+		if (config.onSuccess || config.onFailure) {
+			// Add an ID so errors/receipts can be associated with this message
 			xmppMsg.setID(this._createReceiptId(config));
-			xmppMsg.appendNode(xmppMsg.buildNode("request", null, null,
-					CrocSDK.C.NS.XMPP_RECEIPTS));
+			if (this.supportsReceipts) {
+				xmppMsg.appendNode(xmppMsg.buildNode("request", null, null,
+						CrocSDK.C.NS.XMPP_RECEIPTS));
+			}
 		}
 
 		if (!this.dataApi.crocObject.xmppCon.send(xmppMsg)){
-			CrocSDK.Util.fireEvent(config, 'onFailure', {});	
+			CrocSDK.Util.fireEvent(config, 'onFailure', {});
+			delete this.outstandingMsgMap[xmppMsg.getID()];
 		}
 		this.lastActivity = Date.now();
 		if (this.localComposingTimeoutId) {

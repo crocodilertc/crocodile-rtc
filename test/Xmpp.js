@@ -619,4 +619,49 @@
 		// QUnit will restart once the second croc object has disconnected
 	});
 
+	QUnit.asyncTest("XMPP send to offline user", 1, function(assert) {
+		var croc1 = $.croc(config1);
+		var strData = 'XMPP test message ' + new Date() + '\n';
+		strData += '<>&£äâãéèЖ';
+		// Give up if the test has hung for too long
+		var hungTimerId = setTimeout(function() {
+			assert.ok(false, 'Aborting hung test');
+			croc1.presence.stop();
+			hungTimerId = null;
+		}, 10000);
+
+		croc1.presence.start();
+
+		croc1.presence.onDisconnected = function () {
+			// Make sure we're stopped
+			this.stop();
+			if (hungTimerId) {
+				clearTimeout(hungTimerId);
+				hungTimerId = null;
+			}
+			QUnit.start();
+		};
+
+		croc1.data.onData = function () {
+			assert.ok(false, 'onData fired for error message');
+		};
+
+		var onReady = function () {
+			croc1.data.send(config2.address, strData, {
+				type: 'xmpp',
+				onFailure: function () {
+					assert.ok(true, 'onFailure fired');
+
+					croc1.presence.stop();
+					clearTimeout(hungTimerId);
+					hungTimerId = null;
+				}
+			});
+		};
+
+		croc1.presence.onSelfNotify = onReady;
+
+		// QUnit will restart once the second croc object has disconnected
+	});
+
 }(jQuery));

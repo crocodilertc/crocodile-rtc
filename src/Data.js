@@ -310,6 +310,8 @@
 
 		if (xmppCon) {
 			// Process incoming XMPP message stanzas
+			xmppCon.registerHandler('message', '*', '*', 'error',
+					this._handleXmppMessageError.bind(this));
 			xmppCon.registerHandler('message', this._handleXmppMessage.bind(this));
 		}
 	};
@@ -452,6 +454,7 @@
 	 * 
 	 * @private
 	 * @param {JSJaCMessage} message
+	 * @returns {boolean} 'true' to prevent bubbling of the event
 	 */
 	CrocSDK.DataAPI.prototype._handleXmppMessage = function (message) {
 		var uniqueAddress = message.getFrom();
@@ -483,6 +486,28 @@
 
 		// Let the session handle the rest
 		dataSession._receiveMessage(message);
+		return true;
+	};
+
+	/**
+	 * Handles incoming XMPP message stanzas where type='error'.
+	 * 
+	 * @private
+	 * @param {JSJaCMessage} message
+	 * @returns {boolean} 'true' to prevent bubbling of the event
+	 */
+	CrocSDK.DataAPI.prototype._handleXmppMessageError = function (message) {
+		var address = message.getFromJID().getBareJID();
+		var dataSession = this.xmppDataSessions[address];
+
+		if (dataSession && dataSession.getState() !== 'closed') {
+			// Let the session handle the rest
+			dataSession._receiveMessageError(message);
+		} else {
+			console.warn('Unexpected XMPP error: ', message);
+		}
+
+		return true;
 	};
 
 	/*
