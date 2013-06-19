@@ -327,7 +327,7 @@
 		 * been received.
 		 * @type {CrocSDK.XmppPresenceAPI~availability}
 		 */
-		this.availablity = null;
+		this.availability = null;
 		/**
 		 * The current status string set by the contact.  This will be
 		 * <code>null</code> if the contact's presence information has not been
@@ -1133,7 +1133,7 @@
 	 * @property {string} uniqueAddress The full, unique address of the
 	 * client instance that sent the presence update.
 	 * @property {CrocSDK.XmppPresenceAPI~availability} availability
-	 * The current availablity of the client instance.
+	 * The current availability of the client instance.
 	 * @property {string} status The current status string set by the
 	 * client instance.  This will be null if the client instance did not set
 	 * the status.
@@ -1157,7 +1157,7 @@
 	 * @property {string} address The address of the client instance that sent
 	 * the presence update.
 	 * @property {CrocSDK.XmppPresenceAPI~availability} availability
-	 * The current availablity of the client instance.
+	 * The current availability of the client instance.
 	 * @property {string} status The current status string set by the
 	 * client instance.  This will be null if the client instance did not set
 	 * the status.
