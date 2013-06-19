@@ -435,6 +435,11 @@ var CrocSDK = {};
 
 	function initJsJac(croc) {
 		if (!croc.xmppProxySet || croc.xmppProxySet.length < 1) {
+			// XMPP proxy not configured
+			return;
+		}
+		if (!croc.address) {
+			// Cannot use XMPP anonymously
 			return;
 		}
 
@@ -444,9 +449,12 @@ var CrocSDK = {};
 		if (croc.useTLS) {
 			scheme = 'wss';
 		}
-		// var apiKey = croc.apiKey || '';
-		var apiKey = '';
-		var url = scheme.concat('://', selectedRelay, '/', apiKey);
+		var path = '';
+		if (croc.apiKey) {
+			var addrParts = croc.address.split('@');
+			path = croc.apiKey.concat('/', addrParts[1], '/', addrParts[0]);
+		}
+		var url = scheme.concat('://', selectedRelay, '/', path);
 
 		croc.xmppCon = new JSJaCWebSocketConnection({
 			httpbase : url
