@@ -2612,12 +2612,18 @@ Dialog.prototype = {
       case JsSIP.C.UPDATE:
         // RFC3311 5.2
         if(this.last_update_tx) {
-          if(this.last_update_tx.state !== JsSIP.Transactions.C.STATUS_COMPLETED) {
+          switch(this.last_update_tx.state) {
+          case JsSIP.Transactions.C.STATUS_TRYING:
+          case JsSIP.Transactions.C.STATUS_PROCEEDING:
+            // We have not yet responded to the previous UPDATE
             retryAfter = (Math.random() * 10 | 0) + 1;
             request.reply(500, null, ['Retry-After:'+ retryAfter]);
             return false;
+          default:
+            break;
           }
         }
+        // Cache this UPDATE transaction to check next time
         this.last_update_tx = request.server_transaction;
         break;
     }
