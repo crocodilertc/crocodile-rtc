@@ -905,7 +905,7 @@ var CrocSDK = {};
 					// https://code.google.com/p/webrtc/issues/detail?id=1508
 					// Thus our TURN will not work with this version
 					var m = navigator.userAgent.match(/Chrome\/([0-9]*)/);
-					if (m && parseInt(m[1], 10) < 29) {
+					if (m && parseInt(m[1], 10) < 28) {
 						// Embed the username in the URL
 						var username = encodeURIComponent(response.username);
 						uri = uri.replace(':', ':'.concat(username, '@'));
