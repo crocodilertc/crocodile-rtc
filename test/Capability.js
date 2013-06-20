@@ -57,10 +57,6 @@
 	QUnit.module("Capability API");
 	
 	QUnit.asyncTest("test onWatchRequest events fire", 1, function(assert) {
-		config2.capability.onWatchRequest = function() {
-			assert.ok(true, "onWatchRequest fired");
-			croc1.capability.stop();
-		};
 		var croc1 = $.croc(config1);
 		var croc2 = $.croc(config2);
 		
@@ -68,6 +64,11 @@
 			croc1.capability.watch(config2.address);
 		});
 		
+		croc2.capability.onWatchRequest = function() {
+			assert.ok(true, "onWatchRequest fired");
+			croc1.capability.stop();
+		};
+
 		// Give up if the test has hung for too long
 		setTimeout(function() {
 			croc1.disconnect();
@@ -76,7 +77,19 @@
 	});
 	
 	QUnit.asyncTest("invalid configuration: setWatchStatus sets wrong status", 2, function(assert) {
-		config2.capability.onWatchRequest = function(event) {
+		var croc1 = $.croc(config1);
+		var croc2 = $.croc(config2);
+		
+		croc2.sipUA.on('registered', function () {
+			croc1.capability.watch(config2.address);
+			croc1.capability.stop();
+			setTimeout(function() {
+				assert.strictEqual(croc1.capability.watchDataCache[config2.address].status, "normal", "expected value normal after refresh");
+				croc1.capability.refresh(config2.address);
+			}, 2000);
+		});
+		
+		croc2.capability.onWatchRequest = function(event) {
 			var status = croc1.capability.watchDataCache[config2.address].status;
 			switch (status) {
 				case "normal":
@@ -86,6 +99,15 @@
 					break;
 			}
 		};		
+
+		// Give up if the test has hung for too long
+		setTimeout(function() {
+			croc1.disconnect();
+			croc2.disconnect();
+		}, 5000);
+	});
+	
+	QUnit.asyncTest("invalid configuration: setWatchStatus sets wrong status type", 2, function(assert) {
 		var croc1 = $.croc(config1);
 		var croc2 = $.croc(config2);
 		
@@ -97,16 +119,8 @@
 				croc1.capability.refresh(config2.address);
 			}, 2000);
 		});
-		
-		// Give up if the test has hung for too long
-		setTimeout(function() {
-			croc1.disconnect();
-			croc2.disconnect();
-		}, 5000);
-	});
-	
-	QUnit.asyncTest("invalid configuration: setWatchStatus sets wrong status type", 2, function(assert) {
-		config2.capability.onWatchRequest = function(event) {
+
+		croc2.capability.onWatchRequest = function(event) {
 			var status = croc1.capability.watchDataCache[config2.address].status;
 			switch (status) {
 				case "normal":
@@ -116,18 +130,7 @@
 					break;
 			}
 		};		
-		var croc1 = $.croc(config1);
-		var croc2 = $.croc(config2);
-		
-		croc2.sipUA.on('registered', function () {
-			croc1.capability.watch(config2.address);
-			croc1.capability.stop();
-			setTimeout(function() {
-				assert.strictEqual(croc1.capability.watchDataCache[config2.address].status, "normal", "expected value normal after refresh");
-				croc1.capability.refresh(config2.address);
-			}, 2000);
-		});
-		
+
 		// Give up if the test has hung for too long
 		setTimeout(function() {
 			croc1.disconnect();
@@ -136,19 +139,6 @@
 	});
 	
 	QUnit.asyncTest("test onWatchChange events fire", 9, function(assert) {
-		config1.capability.onWatchChange = function(event) {
-			assert.strictEqual(event.address, croc2.address, "expected address for onWatchChange event");
-			assert.strictEqual(event.status, croc1.capability.watchDataCache[config2.address].status, "expected status for onWatchChange event");
-			assert.deepEqual(event.capabilities, croc1.capability.watchDataCache[config2.address].capabilities, "expected capabilities for onWatchChange event");
-		};
-		config2.capability.onWatchRequest = function(event) {
-			var status = croc1.capability.watchDataCache[config2.address].status;
-			switch (status) {
-				case "normal":
-					event.setWatchStatus("blocked");
-					break;
-			}
-		};		
 		var croc1 = $.croc(config1);
 		var croc2 = $.croc(config2);
 		
@@ -167,6 +157,20 @@
 			}, 6000);
 		});
 		
+		croc1.capability.onWatchChange = function(event) {
+			assert.strictEqual(event.address, croc2.address, "expected address for onWatchChange event");
+			assert.strictEqual(event.status, croc1.capability.watchDataCache[config2.address].status, "expected status for onWatchChange event");
+			assert.deepEqual(event.capabilities, croc1.capability.watchDataCache[config2.address].capabilities, "expected capabilities for onWatchChange event");
+		};
+		croc2.capability.onWatchRequest = function(event) {
+			var status = croc1.capability.watchDataCache[config2.address].status;
+			switch (status) {
+				case "normal":
+					event.setWatchStatus("blocked");
+					break;
+			}
+		};		
+
 		// Give up if the test has hung for too long
 		setTimeout(function() {
 			croc1.disconnect();
@@ -175,9 +179,6 @@
 	});
 	
 	QUnit.asyncTest("Watch Capabilities for address", 5, function(assert) {
-		config1.capability.onWatchChange = function() {
-			croc1.capability.stop();
-		};
 		var croc1 = $.croc(config1);
 		var croc2 = $.croc(config2);
 		var croc3 = $.croc(config3);
@@ -196,6 +197,10 @@
 			assert.strictEqual(croc1.capability.watchList[1], config3.address, 'most recent entry added to end of the watchList');
 		});
 		
+		croc1.capability.onWatchChange = function() {
+			croc1.capability.stop();
+		};
+
 		// Give up if the test has hung for too long
 		setTimeout(function() {
 			croc1.disconnect();
@@ -205,9 +210,6 @@
 	});
 	
 	QUnit.asyncTest("UnWatch Capabilities for address", 6, function(assert) {
-		config1.capability.onWatchChange = function() {
-			croc1.capability.stop();
-		};
 		var croc1 = $.croc(config1);
 		var croc2 = $.croc(config2);
 		var croc3 = $.croc(config3);
@@ -233,7 +235,11 @@
 				assert.strictEqual(croc1.capability.watchList.length, 1, 'entry not present, does not remove an entry from watchList');				
 			}, 4000);
 		});
-		
+
+		croc1.capability.onWatchChange = function() {
+			croc1.capability.stop();
+		};
+
 		// Give up if the test has hung for too long
 		setTimeout(function() {
 			croc1.disconnect();
@@ -243,23 +249,6 @@
 	});
 	
 	QUnit.asyncTest("Refresh Capabilities", 5, function(assert) {
-		config1.capability.onWatchChange = function() {
-			croc1.capability.stop();
-		};
-		config2.capability.onWatchRequest = function(event) {
-			var status = croc1.capability.watchDataCache[config2.address].status;
-			switch (status) {
-				case "normal":
-					event.setWatchStatus("blocked");
-					break;
-				case "blocked":
-					event.setWatchStatus("offline");
-					break;
-				case "offline":
-					event.setWatchStatus("notfound");
-					break;
-			}
-		};
 		var croc1 = $.croc(config1);
 		var croc2 = $.croc(config2);
 		
@@ -285,6 +274,24 @@
 			}, 8000);
 		});
 		
+		croc1.capability.onWatchChange = function() {
+			croc1.capability.stop();
+		};
+		croc2.capability.onWatchRequest = function(event) {
+			var status = croc1.capability.watchDataCache[config2.address].status;
+			switch (status) {
+				case "normal":
+					event.setWatchStatus("blocked");
+					break;
+				case "blocked":
+					event.setWatchStatus("offline");
+					break;
+				case "offline":
+					event.setWatchStatus("notfound");
+					break;
+			}
+		};
+
 		// Give up if the test has hung for too long
 		setTimeout(function() {
 			croc1.disconnect();
@@ -393,11 +400,6 @@
 	});
 	
 	QUnit.asyncTest("test refreshPeriod", 8, function(assert) {
-		config1.capability.onWatchChange = function(event) {
-			assert.strictEqual(event.address, croc2.address, "expected address for onWatchChange event");
-			assert.strictEqual(event.status, croc1.capability.watchDataCache[config2.address].status, "expected status for onWatchChange event");
-			assert.deepEqual(event.capabilities, croc1.capability.watchDataCache[config2.address].capabilities, "expected capabilities for onWatchChange event");
-		};
 		var croc1 = $.croc(config1);
 		var croc2 = $.croc(config2);
 		
@@ -412,6 +414,12 @@
 			}, 7000);
 		});
 		
+		croc1.capability.onWatchChange = function(event) {
+			assert.strictEqual(event.address, croc2.address, "expected address for onWatchChange event");
+			assert.strictEqual(event.status, croc1.capability.watchDataCache[config2.address].status, "expected status for onWatchChange event");
+			assert.deepEqual(event.capabilities, croc1.capability.watchDataCache[config2.address].capabilities, "expected capabilities for onWatchChange event");
+		};
+
 		// Give up if the test has hung for too long
 		setTimeout(function() {
 			croc1.disconnect();

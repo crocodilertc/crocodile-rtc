@@ -102,8 +102,9 @@
 	 * @fires CrocSDK.CapabilityAPI#onWatchChange
 	 */
 	function processOptionsResponse(capabilityApi, watchData, response) {
-		var beforeStatusChange = watchData.status;
-		var beforeCapabiltiesChange = watchData.capabilities;
+		var previousStatus = watchData.status;
+		var previousCapabilities = watchData.capabilities;
+
 		switch (response.status_code) {
 		case 200:
 			watchData.status = "normal";
@@ -118,6 +119,9 @@
 		case 480:
 			watchData.status = "offline";
 			break;
+		default:
+			watchData.status = "error";
+			break;
 		}
 
 		if (response.hasHeader('contact')) {
@@ -125,28 +129,26 @@
 			watchData.capabilities = capabilityApi.parseFeatureTags(parsedContact.parameters);
 		}
 
-		// Fire OnWatchChange event
-		var toAddress = response.parseHeader('to', 0).uri.toAor().replace(/^sip:/, '');
-		var cache = capabilityApi.watchDataCache[toAddress].capabilities;
-		var flag = false;
-		if (beforeCapabiltiesChange) {
-			for ( var prop in watchData.capabilities) {
-				if (beforeCapabiltiesChange.hasOwnProperty(prop)) {
-					if (beforeCapabiltiesChange[prop] !== cache[prop]) {
-						flag = true;
+		var fireEvent = false;
+		if (previousStatus !== watchData.status) {
+			fireEvent = true;
+		} else if (previousCapabilities && response.hasHeader('contact')) {
+			var cache = watchData.capabilities;
+
+			for (var prop in cache) {
+				if (previousCapabilities.hasOwnProperty(prop)) {
+					if (previousCapabilities[prop] !== cache[prop]) {
+						fireEvent = true;
 					}
 				} else {
-					flag = true;
+					fireEvent = true;
 				}
 			}
 		}
-		if (beforeStatusChange !== watchData.status) {
-			CrocSDK.Util.fireEvent(capabilityApi, "onWatchChange", {
-				address : toAddress,
-				status : watchData.status,
-				capabilities : watchData.capabilities
-			});
-		} else if (flag) {
+
+		if (fireEvent) {
+			var toAddress = response.parseHeader('to', 0).uri.toAor().replace(/^sip:/, '');
+
 			CrocSDK.Util.fireEvent(capabilityApi, "onWatchChange", {
 				address : toAddress,
 				status : watchData.status,
@@ -654,6 +656,8 @@
 	 * to appear offline. </li>
 	 * <li><code>notfound</code> - <code>address</code> does not exist or
 	 * wants to appear as if he/she does not exist. </li>
+	 * <li><code>error</code> - the response code did not fit into any of the
+	 * above categories.</li>
 	 * </ul>
 	 * 
 	 * @memberof CrocSDK.CapabilityAPI
