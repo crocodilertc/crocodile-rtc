@@ -263,7 +263,7 @@
 				event.session.accept();
 				assert.strictEqual(event.session.getState(), 'established', 
 						'Session state->established immediately for delayed accepts');
-			}, 1000);
+			}, 3000);
 		};
 
 		croc2.data.onData = function (event) {

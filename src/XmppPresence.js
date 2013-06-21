@@ -80,11 +80,24 @@
 			contactMap[contact.address] = contact;
 		}
 
-		// Copy the array, so application modifications do not affect our copy
-		presenceApi.contactList = [].concat(contacts);
+		// If we have an existing contact list, transfer any presence info
+		var oldContactList = presenceApi.contactList;
+		for (i = 0, len = oldContactList.length; i < len; i++) {
+			var oldContact = oldContactList[i];
+			var newContact = contactMap[oldContact.address];
+			if (newContact) {
+				newContact.availability = oldContact.availability;
+				newContact.status = oldContact.status;
+				newContact.extraNodes = oldContact.extraNodes;
+			}
+		}
+
+		presenceApi.contactList = contacts;
 		presenceApi.contactMap = contactMap;
+
+		// Copy the array, so any application modifications do not affect our copy
 		CrocSDK.Util.fireEvent(presenceApi, 'onContactsReceived', {
-			contacts: contacts
+			contacts: [].concat(contacts)
 		});
 	}
 
