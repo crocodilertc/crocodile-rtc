@@ -89,8 +89,10 @@
 				assert.strictEqual(event.status, status, 'status 2');
 				if (gotContacts) {
 					croc1.presence.stop();
-					clearTimeout(hungTimerId);
-					hungTimerId = null;
+					if (hungTimerId) {
+						clearTimeout(hungTimerId);
+						hungTimerId = null;
+					}
 				}
 				break;
 			default:
@@ -104,8 +106,10 @@
 			assert.deepEqual(event.contacts, [], 'Got empty contact list');
 			if (numSelfNotifies === 2) {
 				croc1.presence.stop();
-				clearTimeout(hungTimerId);
-				hungTimerId = null;
+				if (hungTimerId) {
+					clearTimeout(hungTimerId);
+					hungTimerId = null;
+				}
 			} else {
 				gotContacts = true;
 			}
@@ -175,8 +179,10 @@
 			contact.onRemove = function () {
 				assert.ok(true, 'Contact removed');
 				croc1.presence.stop();
-				clearTimeout(hungTimerId);
-				hungTimerId = null;
+				if (hungTimerId) {
+					clearTimeout(hungTimerId);
+					hungTimerId = null;
+				}
 			};
 		};
 		// QUnit will restart once the croc object has disconnected
@@ -607,8 +613,10 @@
 			
 			croc1.presence.stop();
 			croc2.presence.stop();
-			clearTimeout(hungTimerId);
-			hungTimerId = null;
+			if (hungTimerId) {
+				clearTimeout(hungTimerId);
+				hungTimerId = null;
+			}
 		};
 		
 		var onReady = function () {
@@ -687,8 +695,10 @@
 				
 				croc1.presence.stop();
 				croc2.presence.stop();
-				clearTimeout(hungTimerId);
-				hungTimerId = null;
+				if (hungTimerId) {
+					clearTimeout(hungTimerId);
+					hungTimerId = null;
+				}
 			};
 		};
 		
@@ -751,8 +761,10 @@
 						assert.ok(true, "xmpp onSuccess fired");
 						croc1.presence.stop();
 						croc2.presence.stop();
-						clearTimeout(hungTimerId);
-						hungTimerId = null;
+						if (hungTimerId) {
+							clearTimeout(hungTimerId);
+							hungTimerId = null;
+						}
 					}
 				});
 			} else {
@@ -806,8 +818,10 @@
 			
 			croc1.presence.stop();
 			croc2.presence.stop();
-			clearTimeout(hungTimerId);
-			hungTimerId = null;
+			if (hungTimerId) {
+				clearTimeout(hungTimerId);
+				hungTimerId = null;
+			}
 		};
 		
 		var onReady = function () {
@@ -938,11 +952,11 @@
 					}
 
 					croc1.presence.stop();
+					croc2.presence.stop();
 					if (hungTimerId) {
 						clearTimeout(hungTimerId);
 						hungTimerId = null;
 					}
-					QUnit.start();
 				});
 			} else {
 				firstReady = true;
