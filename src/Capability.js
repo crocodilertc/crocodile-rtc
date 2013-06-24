@@ -227,29 +227,10 @@
 	 * @param {Number}
 	 *            [config.refreshPeriod=15] Time interval (in seconds) between
 	 *            sending capabilities queries to addresses on the watch list.
-	 * @param {CrocSDK.CapabilityAPI#event:onWatchRequest}
-	 *            [config.onWatchRequest]
-	 *            <p>
-	 *            Dispatched when Crocodile RTC JavaScript Library receives a
-	 *            capabilities query from another instance.
-	 *            </p>
-	 * 
-	 * <p>
-	 * If this event is not handled the Crocodile RTC JavaScript Library will
-	 * automatically respond based on the capabilities set in the
-	 * {@link CrocSDK.Croc Croc} Object instance.
-	 * </p>
-	 * @param {CrocSDK.CapabilityAPI#event:onWatchChange}
-	 *            [config.onWatchChange]
-	 *            <p>
-	 *            Dispatched when Crocodile RTC JavaScript Library receives a
-	 *            capabilities query response.
-	 *            </p>
-	 * 
-	 * <p>
-	 * If this event is not handled the Crocodile RTC JavaScript Library will
-	 * cache the capabilities.
-	 * </p>
+	 * @param {function} [config.onWatchRequest] - Handler for the
+	 * {@link CrocSDK.CapabilityAPI#event:onWatchRequest onWatchRequest} event.
+	 * @param {function} [config.onWatchChange] - Handler for the
+	 * {@link CrocSDK.CapabilityAPI#event:onWatchChange onWatchChange} event.
 	 */
 	CrocSDK.CapabilityAPI = function(crocObject, config) {
 		this.crocObject = crocObject;

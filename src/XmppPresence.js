@@ -319,40 +319,54 @@
 		/**
 		 * Whether the contact is pre-approved to watch to the user (but not yet
 		 * watching).
+		 * <p>
+		 * Note that support for pre-approval is optional for XMPP servers. If
+		 * it is not supported, the pre-approval will be ignored, and the
+		 * {@link CrocSDK.XmppPresenceAPI#event:onWatchRequest} event will
+		 * be fired as usual if the contact sends a watch request.
 		 * @type {boolean}
 		 */
 		this.watchingApproved = false;
 		/**
-		 * The contact name/handle.  This will be set to <code>null</code> if
-		 * the name has not been set.
+		 * The contact name/handle.  This will be <code>null</code> if the name
+		 * has not been set.
 		 * @type {string}
 		 */
 		this.name = null;
 		/**
 		 * The group names associated with this contact, represented as an array
 		 * of strings.
-		 * @type {string[]}
+		 * @type {Array<string>}
 		 */
 		this.groups = [];
 		/**
-		 * The current {@link CrocSDK.XmppPresenceAPI~availability availability} of the contact.  This will be
-		 * <code>null</code> if the contact's presence information has not yet
-		 * been received.
+		 * The current availability of the contact.
+		 * <p>
+		 * This is part of the presence information, and thus will be
+		 * <code>null</code> if the contact's presence has not yet been received
+		 * (i.e. if the onNotify event has not yet fired for this contact).
 		 * @type {CrocSDK.XmppPresenceAPI~availability}
 		 */
 		this.availability = null;
 		/**
-		 * The current status string set by the contact.  This will be
-		 * <code>null</code> if the contact's presence information has not been
-		 * received, or if the contact has not set their status.
+		 * The current status set by the contact.  The status is optional; this
+		 * property will be <code>null</code> if the status is not included in
+		 * the presence information.
+		 * <p>
+		 * This is part of the presence information, and thus will be
+		 * <code>null</code> if the contact's presence has not yet been received
+		 * (i.e. if the onNotify event has not yet fired for this contact).
 		 * @type {string}
 		 */
 		this.status = null;
 		/**
 		 * Any extra, unparsed XML data included in the presence update.  This
-		 * will be <code>null</code> if the contact's presence information has
-		 * not yet been received, or if there was no extra data in the presence
-		 * update.
+		 * property will be <code>null</code> if there was no extra data in the
+		 * presence information.
+		 * <p>
+		 * This is part of the presence information, and thus will be
+		 * <code>null</code> if the contact's presence has not yet been received
+		 * (i.e. if the onNotify event has not yet fired for this contact).
 		 * @type {Node}
 		 * @private
 		 */
@@ -393,6 +407,11 @@
 	 * Gives permission (or pre-approval) for the contact to watch the user
 	 * (i.e. receive notification of changes to the user's presence
 	 * information).
+	 * <p>
+	 * Note that support for pre-approval is optional for XMPP servers. If
+	 * it is not supported, the pre-approval will be ignored, and the
+	 * {@link CrocSDK.XmppPresenceAPI#event:onWatchRequest} event will
+	 * be fired as usual if the contact sends a watch request.
 	 * @method CrocSDK.XmppPresenceAPI~Contact#allowWatch
 	 * @returns {boolean} <code>true</code> if the request was sent
 	 * successfully, <code>false</code> otherwise.
@@ -420,17 +439,23 @@
 	};
 
 	/**
-	 * Request that the contact roster be updated with new information.
+	 * Update the contact roster with the provided information.
+	 * <p>
+	 * Any UI updates showing the changes should be made when the onUpdate
+	 * event fires, not when this method is called. This ensures that changes
+	 * are only made once the server saves them, and that changes from other
+	 * client instances are reflected in this instance.
 	 * 
 	 * @method CrocSDK.XmppPresenceAPI~Contact#update
 	 * @param {object} params - The contact details to update.
 	 * @param {string} [params.name] - The contact name/handle to use.  If this
 	 * is omitted the existing name (if any) will be left unmodified.
-	 * @param {string[]} [params.groups] - An array of group names to associate
+	 * @param {Array<string>} [params.groups] - An array of group names to associate
 	 * with this contact.  If this is omitted the existing groups (if any) will
 	 * be left unmodified.
 	 * @returns {boolean} <code>true</code> if the request was sent
 	 * successfully, <code>false</code> otherwise.
+	 * @fires CrocSDK.XmppPresenceAPI~Contact#event:onUpdate
 	 */
 	Contact.prototype.update = function (params) {
 		var updatedContact = new Contact(this.presenceApi, this.address);
@@ -944,8 +969,11 @@
 	/**
 	 * Gets a fresh copy of the contact roster, firing 
 	 * {@link CrocSDK.XmppPresenceAPI#event:onContactsReceived onContactsReceived}
-	 * when complete. This call should be rarely used, as it will be called
-	 * automatically when connecting.
+	 * when complete.
+	 * <p>
+	 * This call should be rarely used, as it will be called automatically when
+	 * connecting to the presence service.  It is provided in case the
+	 * application's copy of the contact list has been lost or corrupted.
 	 */
 	CrocSDK.XmppPresenceAPI.prototype.getContacts = function() {
 		if (!this.running) {
@@ -959,29 +987,29 @@
 	};
 	
 	/**
-	 * Adds a new contact to the roster.
+	 * Adds a new contact to the user's roster.
 	 * 
 	 * @param {string} address The address of the new contact.
 	 * @param {Object} [params] Optional extra information that can be provided
-	 * when adding a {@link CrocSDK.XmppPresenceAPI~Contact contact}. If this 
-	 * object is omitted, the defaults will be used.
-	 * @param {boolean} [params.watch=true]
-	 * Set to <code>true</code> to request to watch the new 
-	 * {@link CrocSDK.XmppPresence~Contact contact}, or <code>false</code> to 
-	 * add the {@link CrocSDK.XmppPresenceAPI~Contact contact} to the roster 
-	 * without watching.
-	 * @param {boolean} [params.allowWatch=true]
-	 * Set to <code>true</code> to pre-approve a watch request from the
-	 * new contact, or <code>false</code> to receive notification of a
-	 * watch request from the contact.
-	 * @param {string} [params.name] The 
-	 * {@link CrocSDK.XmppPresenceAPI~Contact contact} name/handle.  If not 
-	 * provided, the name will not be set for the 
-	 * {@link CrocSDK.XmppPresenceAPI~Contact contact}.
-	 * @param {string[]} [params.groups=[]] An array of group names to associate
-	 * with the {@link CrocSDK.XmppPresenceAPI~Contact contact}.  If not provided,
-	 * the {@link CrocSDK.XmppPresenceAPI~Contact contact} will not be associated
-	 * with any groups (equivalent to an empty array).
+	 * when adding a contact. If this  object is omitted, the defaults will be
+	 * used.
+	 * @param {boolean} [params.watch=true] Set to <code>true</code> to request
+	 * to watch the new contact, or <code>false</code> to add the contact to the
+	 * roster without watching.
+	 * @param {boolean} [params.allowWatch=true] Set to <code>true</code> to
+	 * pre-approve a watch request from the new contact, or <code>false</code>
+	 * to receive notification of a watch request from the contact.
+	 * <p>
+	 * Note that support for pre-approval is optional for XMPP servers. If
+	 * it is not supported, the pre-approval will be ignored, and the
+	 * {@link CrocSDK.XmppPresenceAPI#event:onWatchRequest} event will
+	 * be fired as usual if the contact sends a watch request.
+	 * @param {string} [params.name] The contact name/handle.  If not provided,
+	 * the name will not be set for the contact.
+	 * @param {Array<string>} [params.groups=[]] An array of group names to
+	 * associate with the contact.  If not provided, the contact will not be
+	 * associated with any groups (equivalent to an empty array).
+	 * @see CrocSDK.XmppPresenceAPI~Contact
 	 */
 	CrocSDK.XmppPresenceAPI.prototype.addContact = function(address, params) {
 		if (!this.running) {
@@ -1021,7 +1049,9 @@
 	};
 
 	/**
-	 * Publishes the user's current presence information.
+	 * Publishes new presence information for the current user.  The presence
+	 * service handles distribution of the information to the authorised
+	 * watchers of this user.
 	 * 
 	 * @param {Object} [params] The presence information to publish.  If this is
 	 * omitted, the user's availability will be reset to 'available', and the
@@ -1100,24 +1130,32 @@
 
 	/**
 	 * Event fired when the SDK is disconnected from the presence service.  The
-	 * SDK will attempt to reconnect unless the stop() method has been called.
+	 * SDK will attempt to reconnect unless the
+	 * {@link CrocSDK.XmppPresenceAPI#stop stop()} method is (or has already
+	 * been) called.
 	 * 
 	 * @event CrocSDK.XmppPresenceAPI#onDisconnected
 	 */
 
 	/**
-	 * An event fired when the roster list is received.
+	 * Event fired when the full roster/contact list is received from the
+	 * presence service.  This is expected soon after connecting to the service,
+	 * and after any explicit calls to
+	 * {@link CrocSDK.XmppPresenceAPI#getContacts getContacts()}.
 	 * 
 	 * @event CrocSDK.XmppPresenceAPI#onContactsReceived
 	 * @type {Object}
-	 * @property {CrocSDK.XmppPresenceAPI~Contact[]} contacts
+	 * @property {Array<CrocSDK.XmppPresenceAPI~Contact>} contacts
 	 * The received roster contacts.
 	 */
 
 	/**
-	 * Event fired when a watch request is received.  If the watch request is
-	 * approved, a new contact will be created automatically if the address is
-	 * not already on the contact roster.
+	 * Event fired when a watch request is received.  A watch request indicates
+	 * that another user has added this user to their contact list, and wishes
+	 * to receive presence updates. 
+	 * <p>
+	 * If the watch request is approved, a new contact will be created
+	 * automatically if the address is not already on the contact roster.
 	 * 
 	 * @event CrocSDK.XmppPresenceAPI#onWatchRequest
 	 * @type {CrocSDK.XmppPresenceAPI~WatchRequestEvent}
@@ -1126,12 +1164,16 @@
 	/**
 	 * Event fired when a new contact has been added to the roster.
 	 * <p>
-	 * Note that the new contact could have been added by another client logged
-	 * in as the same user.
+	 * Note that the new contact could have been added by this client, or some
+	 * other client logged in as the same user.  Thus the addition of a new
+	 * contact to the UI should be tied to this event, rather than performed at
+	 * the time {@link CrocSDK.XmppPresenceAPI#addContact addContact()} is
+	 * called.
 	 * 
 	 * @event CrocSDK.XmppPresenceAPI#onNewContact
 	 * @type {Object}
 	 * @property {CrocSDK.XmppPresenceAPI~Contact} contact The new contact.
+	 * @see {@link CrocSDK.XmppPresenceAPI#addContact addContact()}
 	 */
 
 	/**

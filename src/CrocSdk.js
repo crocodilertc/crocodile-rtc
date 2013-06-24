@@ -719,7 +719,7 @@ var CrocSDK = {};
 	 * Defaults to <code>true</code> when the <code>address</code> property
 	 * is set and <code>false</code> when it is not.
 	 * </p>
-	 * @param {String|String[]}
+	 * @param {String|Array<string>}
 	 *            [config.sipProxySet=Crocodile RTC Network values]
 	 *            <p>
 	 *            The set of SIP proxies to use. If more than one is specified,
@@ -731,7 +731,7 @@ var CrocSDK = {};
 	 * <i><b>MUST NOT</b> be explicitly set when the Crocodile RTC JavaScript
 	 * Library is used with the Crocodile RTC Network</i>
 	 * </p>
-	 * @param {String|String[]}
+	 * @param {String|Array<string>}
 	 *            [config.msrpRelaySet=Crocodile RTC Network values]
 	 *            <p>
 	 *            The set of MSRP relays to use. If more than one is specified,
@@ -1146,12 +1146,12 @@ var CrocSDK = {};
 	 */
 	/**
 	 * @memberof CrocSDK.Croc
-	 * @member {String|String[]} sipProxySet
+	 * @member {String|Array<string>} sipProxySet
 	 * @instance
 	 */
 	/**
 	 * @memberof CrocSDK.Croc
-	 * @member {String|String[]} msrpRelaySet
+	 * @member {String|Array<string>} msrpRelaySet
 	 * @instance
 	 */
 	/**
