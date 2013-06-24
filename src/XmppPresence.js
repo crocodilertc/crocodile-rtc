@@ -1173,7 +1173,7 @@
 	 * @event CrocSDK.XmppPresenceAPI#onNewContact
 	 * @type {Object}
 	 * @property {CrocSDK.XmppPresenceAPI~Contact} contact The new contact.
-	 * @see {@link CrocSDK.XmppPresenceAPI#addContact addContact()}
+	 * @see CrocSDK.XmppPresenceAPI#addContact
 	 */
 
 	/**
