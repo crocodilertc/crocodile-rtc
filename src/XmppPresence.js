@@ -766,18 +766,23 @@
 		var oldContact = this.contactMap[contact.address];
 		if (oldContact) {
 			if (contact.removed) {
+				console.log('Removing contact', contact.address);
 				this.contactList.splice(this.contactList.indexOf(oldContact), 1);
 				delete this.contactMap[contact.address];
 				CrocSDK.Util.fireEvent(oldContact, 'onRemove', {});
 			} else {
+				console.log('Updating contact', contact.address);
 				oldContact._update(contact);
 			}
-		} else {
+		} else if (!contact.removed) {
+			console.log('Adding contact', contact.address);
 			this.contactList.push(contact);
 			this.contactMap[contact.address] = contact;
 			CrocSDK.Util.fireEvent(this, 'onNewContact', {
 				contact: contact
 			});
+		} else {
+			console.log('Received roster removal push for unknown contact!');
 		}
 
 		// Send success response
