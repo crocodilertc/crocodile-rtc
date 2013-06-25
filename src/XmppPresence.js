@@ -222,33 +222,27 @@
 	 * Creates a presence message based on the provided parameters.
 	 * 
 	 * @private
-	 * @param {Object} [params] The presence information to set.  If this is
-	 * omitted, the user's availability will be reset to 'available', and the
-	 * user's current status (if any) will be cleared.
-	 * @param {CrocSDK.XmppPresenceAPI~availability} [params.availability=available]
-	 * The user's availability.  Note that the user availability cannot be set
-	 * to <code>unavailable</code> - this is only used when the user signs out.
-	 * @param {string} [params.status] A short description of the user's status.
-	 * If omitted, the current status (if any) will be cleared.
-	 * @param {Node} [params.extraNodes] Additional XML data to include
-	 * in the presence update.  To include more than one node, wrap them in a
-	 * DocumentFragment object.
+	 * @param {CrocSDK.Croc} croc - The parent Croc object.
+	 * @param {CrocSDK.XmppPresenceAPI~PresenceInfo} [info]
+	 * The presence information to set.  If this is omitted, the user's
+	 * availability will be reset to 'available', and the user's current status
+	 * (if any) will be cleared.
 	 * @return {JSJaCPresence}
 	 */
-	function createPresence(params, croc) {
+	function createPresence(croc, info) {
 		var presence = new JSJaCPresence();
 
-		if (params) {
-			if (params.availability &&
-					allowedAvailability.indexOf(params.availability) !== -1) {
-				presence.setShow(params.availability);
+		if (info) {
+			if (info.availability &&
+					allowedAvailability.indexOf(info.availability) !== -1) {
+				presence.setShow(info.availability);
 			}
 	
-			if (params.status) {
-				presence.setStatus(params.status);
+			if (info.status) {
+				presence.setStatus(info.status);
 			}
 	
-			var extraNodes = params.extraNodes;
+			var extraNodes = info.extraNodes;
 			if (extraNodes) {
 				if (!extraNodes instanceof Node) {
 					throw new TypeError('Unexpected type for extraNodes');
@@ -1002,8 +996,8 @@
 	 * <p>
 	 * Note that support for pre-approval is optional for XMPP servers. If
 	 * it is not supported, the pre-approval will be ignored, and the
-	 * {@link CrocSDK.XmppPresenceAPI#event:onWatchRequest} event will
-	 * be fired as usual if the contact sends a watch request.
+	 * {@link CrocSDK.XmppPresenceAPI#event:onWatchRequest onWatchRequest} event
+	 * will be fired as usual if the contact sends a watch request.
 	 * @param {string} [params.name] The contact name/handle.  If not provided,
 	 * the name will not be set for the contact.
 	 * @param {Array<string>} [params.groups=[]] An array of group names to
@@ -1053,27 +1047,17 @@
 	 * service handles distribution of the information to the authorised
 	 * watchers of this user.
 	 * 
-	 * @param {Object} [params] The presence information to publish.  If this is
-	 * omitted, the user's availability will be reset to 'available', and the
-	 * user's current status (if any) will be cleared.
-	 * @param {CrocSDK.XmppPresenceAPI~availability} [params.availability=available]
-	 * The user's availability.  Note that the user availability cannot be set
-	 * to <code>unavailable</code> - this is only used when the user signs out.
-	 * @param {string} [params.status] A short description of the user's status.
-	 * If omitted, the current status (if any) will be cleared.
+	 * @param {CrocSDK.XmppPresenceAPI~PresenceInfo} [info]
+	 * The presence information to publish.  If this is omitted, the user's
+	 * availability will be reset to 'available', and the user's current status
+	 * (if any) will be cleared.
 	 */
-	/*
-	 * Undocumented extra parameter:
-	 * @param {Node} [params.extraNodes] Additional XML nodes to include
-	 * in the presence update.  To include more than one node, wrap them in a
-	 * DocumentFragment object.
-	 */
-	CrocSDK.XmppPresenceAPI.prototype.publishPresence = function(params) {
+	CrocSDK.XmppPresenceAPI.prototype.publishPresence = function(info) {
 		if (!this.running) {
 			throw new CrocSDK.Exceptions.StateError('Presence not started');
 		}
 
-		var presence = createPresence(params, this.crocObject);
+		var presence = createPresence(this.crocObject, info);
 		this.crocObject.xmppCon.send(presence);
 	};
 
@@ -1090,28 +1074,18 @@
 	 * presence information (as seen by watching contacts).
 	 * 
 	 * @param {string} address
-	 * @param {Object} [params] The presence information to send.  If this is
-	 * omitted, the user's current published presence will be sent.
-	 * @param {CrocSDK.XmppPresenceAPI~availability} [params.availability=available]
-	 * The user's availability.  Note that the user availability cannot be set
-	 * to <code>unavailable</code> - this is only used when the user signs out.
-	 * @param {string} [params.status] A short description of the user's status.
-	 * If omitted, the current status (if any) will be cleared.
+	 * @param {CrocSDK.XmppPresenceAPI~PresenceInfo} [params]
+	 * The presence information to send.  If this is omitted, the user's current
+	 * published presence will be sent.
 	 */
-	/*
-	 * Undocumented extra parameter:
-	 * @param {Node} [params.extraNodes] Additional XML nodes to include
-	 * in the presence update.  To include more than one node, wrap them in a
-	 * DocumentFragment object.
-	 */
-	CrocSDK.XmppPresenceAPI.prototype.sendPresence = function(address, params) {
+	CrocSDK.XmppPresenceAPI.prototype.sendPresence = function(address, info) {
 		if (!this.running) {
 			throw new CrocSDK.Exceptions.StateError('Presence not started');
 		}
 
 		var presence;
-		if (params) {
-			presence = createPresence(params, this.crocObject);
+		if (info) {
+			presence = createPresence(this.crocObject, info);
 		} else {
 			presence = this.currentPresence.clone();
 		}
@@ -1223,4 +1197,18 @@
 	 * included in the presence update.
 	 */
 
+	/**
+	 * @typedef {Object} CrocSDK.XmppPresenceAPI~PresenceInfo
+	 * @property {CrocSDK.XmppPresenceAPI~availability} [availability=available]
+	 * The user's availability.  Note that the user availability cannot be set
+	 * to <code>unavailable</code> - this is only used when the user signs out.
+	 * @property {string} [status] A short description of the user's status.
+	 * If omitted, the current status (if any) will be cleared.
+	 */
+	/*
+	 * Undocumented extra property:
+	 * @property {Node} [extraNodes] Additional XML data to include
+	 * in the presence update.  To include more than one node, wrap them in a
+	 * DocumentFragment object.
+	 */
 }(CrocSDK));

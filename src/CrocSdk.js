@@ -1006,11 +1006,6 @@ var CrocSDK = {};
 	 */
 	/**
 	 * @memberof CrocSDK.Croc
-	 * @member {Boolean} useTLS
-	 * @instance
-	 */
-	/**
-	 * @memberof CrocSDK.Croc
 	 * @member {Number} acceptTimeout
 	 * @instance
 	 */

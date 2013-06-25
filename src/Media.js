@@ -648,10 +648,6 @@
 	 * @function CrocSDK.MediaAPI~MediaSession#accept
 	 * @param {CrocSDK.MediaAPI~StreamConfig}
 	 *            [config] Used to selectively accept or modify the streams.
-	 * @param {CrocSDK.MediaAPI~StreamDirections}
-	 *            [config.audio] The audio stream configuration.
-	 * @param {CrocSDK.MediaAPI~StreamDirections}
-	 *            [config.video] The video stream configuration.
 	 * @fires CrocSDK.MediaAPI~MediaSession#onConnect
 	 */
 	MediaSession.prototype.accept = function(config) {
@@ -1003,30 +999,6 @@
 	 *            {@link CrocSDK.MediaAPI Media} connnection to.
 	 * @param {CrocSDK.MediaAPI~ConnectConfig}
 	 *            connectConfig Optional configuration properties.
-	 * @param {CrocSDK.DataAPI~CustomHeaders}
-	 *            connectConfig.customHeaders
-	 *            <p>
-	 *            This enables the web-app to specify custom headers that will
-	 *            be included in the session creation request. The key names
-	 *            provided will be used as the header names and the associated
-	 *            String values will be used as the header values.
-	 *            </p>
-	 * 
-	 * <p>
-	 * All custom header keys <b>MUST</b> start with &#34;X-&#34; Keys that do
-	 * not start &#34;X-&#34; will be ignored.
-	 * </p>
-	 * 
-	 * <p>
-	 * These custom headers will be available to the local and remote party in
-	 * the
-	 * {@link CrocSDK.MediaAPI~MediaSession#customHeaders MediaSession.customHeaders}
-	 * property and to the remote party in the
-	 * {@link CrocSDK.MediaAPI~~MediaSession~OnRenegotiationRequestEvent OnRenegotiationRequestEvent.customHeaders}
-	 * property during session renegotiation.
-	 * </p>
-	 * @param {CrocSDK.MediaAPI~StreamConfig}
-	 *            connectConfig.streamConfig The media stream configuration.
 	 * @returns CrocSDK.MediaAPI~MediaSession
 	 */
 	CrocSDK.MediaAPI.prototype.connect = function(address, connectConfig) {

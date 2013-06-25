@@ -45,7 +45,7 @@
 	 * 
 	 * @memberof CrocSDK
 	 * @function
-	 * @property {CrocSDK~Config} config
+	 * @param {CrocSDK~Config} config
 	 *            <p>
 	 *            The <code>config</code> parameter should be an object
 	 *            containing any properties/event handlers you want to

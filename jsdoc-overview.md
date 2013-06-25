@@ -38,39 +38,34 @@ In addition to reducing development time and complexity using the Crocodile Real
 
 ## The Crocodile RTC Javascript Library ##
 
-#### Figure 1.1 Crocodile RTC Javascript Library architecture ####
 ![architecture](resources/architecture.png)
 
-### Other libraries used by the Crocodile RTC Javascript Library ###
+### Libraries used by the Crocodile RTC Javascript Library ###
 
-#### Table 1.1 Libraries used by the Crocodile RTC Javascript Library ####
+* [JsSIP](http://jssip.net/) (currently using the [crocodile branch on GitHub](https://github.com/crocodilertc/jssip/))
 
-[Crocodile MSRP](https://code.google.com/p/crocodile-msrp/)
+* [Crocodile MSRP](https://code.google.com/p/crocodile-msrp/)
 
-[JQuery](http://jquery.com/)
-
-[JsSIP](http://www.jssip.net/)
+* [JQuery](http://jquery.com/)
 
 ### Using the Crocodile RTC Javascript Library ###
 
 The Crocodile RTC Javascript Library may be used with any compliant SIP network, but out of the box it is designed to connect to (and work seamlessly) with the Crocodile RTC Network. To use the Crocodile RTC Network you must create a developer account in our developer portal and allocate yourself an API key.
  
-To use the Crocodile RTC Javascript Library in your application you just need to include it, and jQuery, at the top of your page.
-
-#### Example 1.1 Including the Crocodile RTC Javascript Library in your page ####
+To use the Crocodile RTC Javascript Library in your application you just need to include it, and jQuery, at the top of your page:
 
 	<script url="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
-	<script url="http://www.crocodilertc.net/???/crocodile-rtc.min.js"></script>
+	<script url="//www.crocodilertc.net/sdk/latest/crocodile-rtc.min.js"></script>
 
-#### Note ####
+#### Choosing the JavaScript source URL ####
 
 You can choose whether to include the Crocodile RTC Javascript Library directly from the developer portal website or from the server that is hosting your application.
 
 The advantage of including the Crocodile RTC Javascript Library from the server hosting your application is that GET requests used to establish WebSocket connections will contain an Origin: header identifying the server hosting the application. This allows you to enable API key security for your application in the developer portal which ensures that your API key is only used with a specific web-site.
 
-Once you have included the Crocodile RTC Javascript Library you need to instantiate the Crocodile RTC Javascript Library object.
+#### Creating the Croc object ####
 
-#### Example 1.2 Instantiating the Crocodile RTC Javascript Library object ####
+Once you have included the Crocodile RTC Javascript Library you need to instantiate the Crocodile RTC Javascript Library object.
 
 	<script>
 	$(document).ready(function() {
