@@ -603,12 +603,12 @@
 	 * 
 	 * @constructor
 	 * @memberof CrocSDK
-	 * @param {CrocSDK.Croc} crocObject The parent Croc object.
-	 * @param config The Croc object configuration.
+	 * @param {CrocSDK.Croc} crocObject - The parent Croc object.
+	 * @param {CrocSDK~Config} config - The Croc object configuration.
 	 */
 	CrocSDK.XmppPresenceAPI = function (crocObject, config) {
 		this.crocObject = crocObject;
-		config.jQuery.extend(this, config.data);
+		config.jQuery.extend(this, config.presence);
 		
 		this.running = false;
 		this.reconnectTimerId = null;

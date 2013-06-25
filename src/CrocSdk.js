@@ -81,7 +81,6 @@ var CrocSDK = {};
 			idleTimeout : 'number',
 			onDataSession : 'function',
 			onData : 'function',
-			onComposingStateChange: 'function',
 			onXHTMLReceived: 'function'
 		},
 		media : {
@@ -628,171 +627,12 @@ var CrocSDK = {};
 	 * </p>
 	 * 
 	 * @constructor
-	 * @param {Object}
-	 *            config An object containing any properties/event handlers you
-	 *            want to configure; any that are not provided will be set to
-	 *            their default value.
-	 * @param {String}
-	 *            config.apiKey
-	 *            <p>
-	 *            The organisation/developer/site API key to use when connecting
-	 *            to the Crocodile RTC Network. The API key will be included as
-	 *            a cookie in the HTTP GET used for WebSocket connection
-	 *            establishment.
-	 *            </p>
-	 * 
+	 * @param {CrocSDK~Config} config - A configuration object containing any
+	 * properties/event handlers you wish to configure; any that are not
+	 * provided will be set to their default value.
 	 * <p>
-	 * API keys for the Crocodile RTC Network are allocated using the developer
-	 * portal and an organisation/developer may have several API keys. API key
-	 * security can be (optionally) used to ensure that web-app JavaScript has
-	 * been downloaded from a site associated with the API key.
-	 * </p>
-	 * @param {CrocSDK.Croc~Capabilities}
-	 *            [config.capabilities=detected]
-	 *            <p>
-	 *            An object describing the capabilities the web app supports.
-	 *            </p>
-	 * 
-	 * <p>
-	 * If a {@link CrocSDK.Croc~capabilities Capabilities} object is specified,
-	 * its properties will be merged with (and override) the Crocodile RTC
-	 * JavaScript Library default/detected capabilities. This way, you do not
-	 * need to specify values for every possible capability, only the ones you
-	 * wish to override. For example, if you have a webcam, but do not wish to
-	 * support video, the following capabilities object should be used:
-	 * </p>
-	 * 
-	 * <p>
-	 * <b>Example 6.1 Custom capabilities</b> <br>
-	 * <code>{ "sip.video": false }</code></br>
-	 * </p>
-	 * @param {String}
-	 *            config.address
-	 *            <p>
-	 *            This property is the address associated with the current user.
-	 *            It takes the same format as an email address, i.e.
-	 *            user@domain.com. This is needed if the web-app may receive
-	 *            inbound requests (the <code>register</code> property is
-	 *            <code>true</code>), or if user authentication is required.
-	 *            </p>
-	 * 
-	 * <p>
-	 * The <code>password</code> property must also be specified if this
-	 * property is set.
-	 * </p>
-	 * @param {String}
-	 *            config.password
-	 *            <p>
-	 *            This property is the password used for authenticating with the
-	 *            network. When using the Crocodile RTC Network, user
-	 *            authentication may not be needed, depending on the API key
-	 *            settings.
-	 *            </p>
-	 * 
-	 * <p>
-	 * The <code>address</code> property must also be specified if this
-	 * property is set.
-	 * </p>
-	 * @param {String}
-	 *            [config.authorizationUser]
-	 *            <p>
-	 *            This property sets the username used for authentication
-	 *            purposes. If it is not specified the <code>address</code>
-	 *            property is used. It is not used when connecting to the
-	 *            Crocodile RTC Network.
-	 *            </p>
-	 * @param {String}
-	 *            [config.displayName]
-	 *            <p>
-	 *            Descriptive name for the current user which may be displayed
-	 *            to other users - must not include " characters.
-	 *            </p>
-	 * @param {Boolean}
-	 *            [config.register=detected]
-	 *            <p>
-	 *            If set to <code>true</code> and the <code>address</code>
-	 *            property is set the Crocodile RTC JavaScript Library will
-	 *            register on the network, enabling inbound connections.
-	 *            </p>
-	 * 
-	 * <p>
-	 * Defaults to <code>true</code> when the <code>address</code> property
-	 * is set and <code>false</code> when it is not.
-	 * </p>
-	 * @param {String|Array<string>}
-	 *            [config.sipProxySet=Crocodile RTC Network values]
-	 *            <p>
-	 *            The set of SIP proxies to use. If more than one is specified,
-	 *            SIP outbound (RFC 5626) will be used to connect to at least
-	 *            two of the proxies.
-	 *            </p>
-	 * 
-	 * <p>
-	 * <i><b>MUST NOT</b> be explicitly set when the Crocodile RTC JavaScript
-	 * Library is used with the Crocodile RTC Network</i>
-	 * </p>
-	 * @param {String|Array<string>}
-	 *            [config.msrpRelaySet=Crocodile RTC Network values]
-	 *            <p>
-	 *            The set of MSRP relays to use. If more than one is specified,
-	 *            new MSRP connections will be load-shared across the set.
-	 *            </p>
-	 * 
-	 * <p>
-	 * <i><b>MUST NOT</b> be explicitly set when the Crocodile RTC JavaScript
-	 * Library is used with the Crocodile RTC Network</i>
-	 * </p>
-	 * @param {Number}
-	 *            [config.expiresTime=600]
-	 *            <p>
-	 *            Time (in seconds) that is used for network registration
-	 *            expiry. The Crocodile RTC JavaScript Library automatically
-	 *            refreshes the registration as long as it remains connected.
-	 *            </p>
-	 * @param {Boolean}
-	 *            [config.requireMatchingVersion=false]
-	 *            <p>
-	 *            When connecting to another instance of the Crocodile RTC
-	 *            JavaScript Library, this property decides whether matching SDK
-	 *            versions are required. This is the most extreme, but safest
-	 *            way to avoid compatibility issues between instances.
-	 *            </p>
-	 * 
-	 * <p>
-	 * If set to <code>true</code> and the versions do not match:
-	 * <ul>
-	 * <li>Inbound sessions will be rejected automatically, without notifying
-	 * the application.</li>
-	 * 
-	 * <li>Outbound sessions will be refused (with a
-	 * {@link CrocSDK.Exceptions#VersionError VersionError} exception) if the
-	 * remote party is being watched, and we have already cached the
-	 * capabilities.</li>
-	 * 
-	 * <li>Outbound sessions will be closed automatically if the session is
-	 * established before we discover the version (assuming the remote party has
-	 * &#34;requireMatchingVersion=<code>false</code>&#34;, and has not
-	 * rejected the session).</li>
-	 * </p>
-	 * @param {Boolean}
-	 *            [config.useTLS=true]
-	 *            <p>
-	 *            If set to <code>true</code>, the Crocodile RTC JavaScript
-	 *            Library will establish secure WebSocket connections to the SIP
-	 *            proxies and MSRP relays.
-	 *            </p>
-	 * @param {Number}
-	 *            [config.acceptTimeout=300]
-	 *            <p>
-	 *            Time (in seconds) after which pending inbound sessions will be
-	 *            rejected.
-	 *            </p>
-	 * @param {Function}
-	 *            [config.onConnected] The
-	 *            {@link CrocSDK.Croc#onConnected OnConnected} event.
-	 * @param {Function}
-	 *            [config.onDisconnected] The
-	 *            {@link CrocSDK.Croc#onDisconnected OnDisconnected} event.
+	 * To use the Crocodile network, you must at least provide the
+	 * <code>apiKey</code> property.
 	 */
 	CrocSDK.Croc = function(config) {
 		var croc = this;

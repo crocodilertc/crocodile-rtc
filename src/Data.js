@@ -233,58 +233,9 @@
 	 * 
 	 * @constructor
 	 * @memberof CrocSDK
-	 * @param {CrocSDK.Croc}
-	 *            crocObject The parent {@link CrocSDK.Croc Croc} object.
-	 * @param {Object}
-	 *            [config] The {@link CrocSDK.Croc Croc} object configuration.
-	 * @param {Number}
-	 *            [config.idleTimeout=300] Time (in seconds) after which idle
-	 *            sessions will be closed.
-	 * @param {CrocSDK.DataAPI#event:onData}
-	 *            [config.onData]
-	 *            <p>
-	 *            Dispatched when Crocodile RTC JavaScript Library receives data
-	 *            on a {@link CrocSDK.MsrpDataSession DataSession}
-	 *            that does not have an <code>onData()</code> handler.
-	 *            </p>
-	 * 
-	 * <p>
-	 * This event is generated once per call to <code>send()</code> by the
-	 * remote party.
-	 * </p>
-	 * 
-	 * <p>
-	 * If you need to get progress updates during large transfers, you must add
-	 * an event handler for the <code>onDataStart</code> event of the
-	 * {@link CrocSDK.MsrpDataSession DataSession} object to get
-	 * access to the associated
-	 * {@link CrocSDK.MsrpDataSession~TransferProgress TransferProgress} object
-	 * instance.
-	 * </p>
-	 * 
-	 * <p>
-	 * If this event is not handled the Crocodile RTC JavaScript Library will do
-	 * nothing when this event occurs.
-	 * </p>
-	 * @param {CrocSDK.DataAPI#event:onDataSession}
-	 *            [config.onDataSession]
-	 *            <p>
-	 *            Dispatched when Crocodile RTC JavaScript Library receives a
-	 *            request for a new session from another party on the Crocodile
-	 *            RTC Network.
-	 *            </p>
-	 * 
-	 * <p>
-	 * An instance of Crocodile RTC JavaScript Library cannot receive inbound
-	 * sessions unless the {@link CrocSDK.Croc#register register} property was
-	 * set to <code>true</code> when the {@link CrocSDK.Croc Croc} Object was
-	 * instantiated.
-	 * </p>
-	 * 
-	 * <p>
-	 * If this event is not handled the Crocodile RTC JavaScript Library will
-	 * automatically reject inbound sessions.
-	 * </p>
+	 * @param {CrocSDK.Croc} crocObject
+	 * The parent {@link CrocSDK.Croc Croc} object.
+	 * @param {CrocSDK~Config} config - The Croc object configuration.
 	 */
 	CrocSDK.DataAPI = function(crocObject, config) {
 		this.crocObject = crocObject;

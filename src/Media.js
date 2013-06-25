@@ -878,13 +878,9 @@
 	 * </p>
 	 * 
 	 * @constructor
-	 * @param {CrocSDK.Croc}
-	 *            crcoObject An instance of the {@link CrocSDK.Croc Croc}
-	 *            Object.
-	 * @param {Object}
-	 *            config An object containing any properties/event handlers you
-	 *            want to configure; any that are not provided will be set to
-	 *            their default value.
+	 * @param {CrocSDK.Croc} crocObject - The parent {@link CrocSDK.Croc Croc}
+	 * object.
+	 * @param {CrocSDK~Config} config - The Croc object configuration.
 	 */
 	CrocSDK.MediaAPI = function(crocObject, config) {
 		this.crocObject = crocObject;

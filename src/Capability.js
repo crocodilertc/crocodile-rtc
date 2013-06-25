@@ -220,17 +220,8 @@
 	 * 
 	 * @constructor
 	 * @memberof CrocSDK
-	 * @param {CrocSDK.Croc}
-	 *            crocObject An instance of the Croc Object
-	 * @param [config]
-	 *            The Croc object configuration.
-	 * @param {Number}
-	 *            [config.refreshPeriod=15] Time interval (in seconds) between
-	 *            sending capabilities queries to addresses on the watch list.
-	 * @param {function} [config.onWatchRequest] - Handler for the
-	 * {@link CrocSDK.CapabilityAPI#event:onWatchRequest onWatchRequest} event.
-	 * @param {function} [config.onWatchChange] - Handler for the
-	 * {@link CrocSDK.CapabilityAPI#event:onWatchChange onWatchChange} event.
+	 * @param {CrocSDK.Croc} crocObject - The parent Croc object
+	 * @param {CrocSDK~Config} config - The Croc object configuration.
 	 */
 	CrocSDK.CapabilityAPI = function(crocObject, config) {
 		this.crocObject = crocObject;
