@@ -3,10 +3,7 @@
 Simplified web-based real-time communications built around WebRTC, SIP, MSRP, and XMPP.
 
 ## Getting Started
-Download the [production version][min] or the [development version][max].
-
-[min]: https://raw.github.com/crocodilertc/crocodile-rtc/master/dist/crocodile-rtc.min.js
-[max]: https://raw.github.com/crocodilertc/crocodile-rtc/master/dist/crocodile-rtc.js
+If you're only intrested in using the library, you can download the single-file concatenated or minified versions from https://www.crocodilertc.net/sdk.
 
 In your web page:
 
