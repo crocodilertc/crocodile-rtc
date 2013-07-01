@@ -3,7 +3,7 @@
 Simplified web-based real-time communications built around WebRTC, SIP, MSRP, and XMPP.
 
 ## Getting Started
-If you're only intrested in using the library, you can download the single-file concatenated or minified versions from https://www.crocodilertc.net/sdk.
+If you're only interested in using the library, you can download the single-file concatenated or minified versions from https://www.crocodilertc.net/sdk.
 
 In your web page:
 
@@ -22,6 +22,13 @@ In your web page:
 </script>
 ```
 
+Please also consider joining the mailing lists so you can ask for assistance and keep up-to-speed with the latest developments in the library:
+* [crocodile-rtc-announce][announce]: Announcements of new releases, features, etc.
+* [crocodile-rtc-discuss][discuss]: General discussion - ask questions and raise issues here.
+
+[announce]: https://groups.google.com/forum/?hl=en#!forum/crocodile-rtc-announce
+[discuss]: https://groups.google.com/forum/?hl=en#!forum/crocodile-rtc-discuss
+
 ## Dependencies
 
 The only dependency required by the distributed library is jQuery.  The library has primarily been tested with jQuery 1.9.1.
@@ -39,7 +46,10 @@ The documentation for the current release is available at http://www.crocodilert
 
 Alternatively, you can build the latest documentation directly from the JSDoc comments in the code; see [CONTRIBUTING.md][contrib] for instructions on building the code.
 
+If the documentation doesn't help, please visit the [crocodile-rtc-discuss mailing list][discuss] or the [forums][forums] for further assistance.
+
 [contrib]: https://github.com/crocodilertc/crocodile-rtc/blob/master/CONTRIBUTING.md
+[forums]: https://forums.crocodilertc.net/
 
 ## Examples
 _(Coming soon)_
@@ -49,5 +59,4 @@ See [CONTRIBUTING.md][contrib]
 
 ## Release History
 
-### v1.0 (2013-06-11)
-* Initial public release
+No releases yet!
