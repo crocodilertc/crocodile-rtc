@@ -299,6 +299,52 @@
 	 * event handler.
 	 * </p>
 	 * 
+	 * <p>
+	 * This example makes use of the 
+	 * {@link CrocSDK.MsrpDataSession~TransferProgress TransferProgress} object
+	 * to monitor incoming file transfers. The code to implement the progress 
+	 * bar is not included.
+	 *   <pre>
+	 *   <code>
+	 *     var crocObject = $.croc({
+	 *       apiKey: "API_KEY_GOES_HERE",
+	 *       onConnected: function () {
+	 *         // Update the UI to show we are listening for incoming connections
+	 *       },
+	 *       
+	 *       data: {
+	 *         onSession: function(event) {
+	 *           // Add event handler for file transfers on the new incoming session
+	 *           event.session.onDataStart = function (event) {
+	 *             // Create new progress bar for each file transfer
+	 *             var bar = new MyAwesomeFileTransferProgressBar();
+	 *             
+	 *             // Enable the abort button on the UI
+	 *             bar.onAbort = function () {
+	 *               event.transferProgress.abort();
+	 *             };
+	 *             
+	 *             // Add event handlers to the TransferProgress object to update the UI
+	 *             event.transferProgress.onProgress = function (event) {
+	 *               bar.updateProgress(event.percentComplete);
+	 *             };
+	 *             event.transferProgress.onSuccess = function (event) {
+	 *               bar.addSaveLink(event.data);
+	 *             };
+	 *             event.transferProgress.onFailure = function (event) {
+	 *               bar.transferFailed();
+	 *             };
+	 *           };
+	 *           
+	 *           // Accept the incoming session
+	 *           event.session.accept();
+	 *         }
+	 *       }
+	 *     });
+	 *   </code>
+	 *   </pre>
+	 * </p> 
+	 * 
 	 * @memberof CrocSDK.MsrpDataSession
 	 * @constructor
 	 * @classdesc Represents a TransferProgress Object.
@@ -445,6 +491,45 @@
 	 * control as the Crocodile RTC JavaScript Library will manage sessions 
 	 * automatically. Web-apps that receive inbound data must use the 
 	 * <code>accept()</code> method.
+	 * </p>
+	 * 
+	 * <p>
+	 * The simplest applications will only use the top-level send function and 
+	 * onData handler; the only interaction with a session would be to 
+	 * automatically accept it.
+	 * </p>
+	 * 
+	 * <p>
+	 * An example using Automatic session Management:
+	 *   <pre>
+	 *   <code>
+	 *     var crocObject = $.croc({
+	 *       apiKey: "API_KEY_GOES_HERE",
+	 *       onConnected: function () {
+	 *         this.data.send('sip:bob@example.com', 'Web application ready');
+	 *       },
+	 *       
+	 *       data: {
+	 *         onSession: function(event) {
+	 *           // Accept every incoming session
+	 *           event.session.accept();
+	 *         },
+	 *         onData: function(event) {
+	 *           alert('Data received from ' + event.address + ':\n' + event.data);
+	 *         }
+	 *       }
+	 *     });
+	 *   </code>
+	 *   </pre>
+	 * </p>
+	 * 
+	 * <p>
+	 * In this case the SDK handles the sessions automatically: re-using 
+	 * sessions if they already exist to save the time involved in setting up 
+	 * new sessions, but also closing them to save resources if they are unused 
+	 * for a long time. If the application does not need to support incoming 
+	 * sessions, then even the onSession handler can be dropped, and there are 
+	 * no interactions with DataSession objects at all.
 	 * </p>
 	 * 
 	 * @memberof CrocSDK

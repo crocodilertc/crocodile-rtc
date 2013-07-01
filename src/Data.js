@@ -231,6 +231,37 @@
 	 * would be accessed as <code>crocObject.data.acceptTimeout</code>
 	 * </p>
 	 * 
+	 * <p>
+	 * An example using the Data API:
+	 *   <pre>
+	 *   <code>
+	 *   var crocObject = $.croc({
+	 *     apiKey: "API_KEY_GOES_HERE",
+	 *     onConnected: function () {
+	 *       // Some code
+	 *     },
+	 *     
+	 *     // Data API configuration
+	 *     data: {
+	 *       // Optional parameters
+	 *       acceptTimeout: 300,   // Incoming sessions will be rejected if not accepted within this time (seconds)
+	 *       idleTimeout: 300,     // Idle sessions will be closed if not reused within this time (seconds)
+	 *       
+	 *       // Optional event handlers
+	 *       onSession: function(event) {
+	 *         // Handle incoming session
+	 *       },
+	 *       onData: function(event) {
+	 *         // Handle incoming data (simple case, where SDK handles sessions)
+	 *       }
+	 *     }
+	 *   });
+	 *   
+	 *   var dataSession = crocObject.data.send(address, data, config);
+	 *   </code>
+	 *   </pre>
+	 * </p>
+	 * 
 	 * @constructor
 	 * @memberof CrocSDK
 	 * @param {CrocSDK.Croc} crocObject
