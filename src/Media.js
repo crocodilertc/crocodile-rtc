@@ -280,44 +280,39 @@
 			CrocSDK.Util.fireEvent(mediaSession, 'onProvisional', {});
 		});
 		sipSession.on('started', function(event) {
+			var response = event.data.response;
+
 			mediaSession.state = mediaSessionState.ESTABLISHED;
 
-			if (event.data.response) {
+			if (response) {
 				// We've got the response to an outgoing session
-				// Make sure we haven't already provided an
-				// answer (retransmissions)
-				if (mediaSession.peerConnection.signalingState === 'have-local-offer') {
-					var eventData = event.data;
-
-					var onSuccess = function() {
-						console.log('Remote answer set');
-						CrocSDK.Util.fireEvent(mediaSession, 'onConnect', {});
-						setRemoteStreamOutput(mediaSession);
-					};
-					var onFailure = function(error) {
-						console.warn('setRemoteDescription failed:', error);
-						mediaSession.sipSession.terminate({
-							status_code: 488
-						});
-						// SIP session has already ended
-						mediaSession.sipSession = null;
-						// Clean up everything else, then notify app
-						mediaSession.close();
-					};
-					var sdp = eventData.response.body;
-
-					console.log('Setting remote description');
-					// Update session streamConfig based on the
-					// answer
-					mediaSession.streamConfig = streamConfigFromSdp(
-							new CrocMSRP.Sdp.Session(sdp));
-					var description = new JsSIP.WebRTC.RTCSessionDescription({
-						type : 'answer',
-						sdp : sdp
+				var onSuccess = function() {
+					console.log('Remote answer set');
+					CrocSDK.Util.fireEvent(mediaSession, 'onConnect', {});
+					setRemoteStreamOutput(mediaSession);
+				};
+				var onFailure = function(error) {
+					console.warn('setRemoteDescription failed:', error);
+					mediaSession.sipSession.terminate({
+						status_code: 488
 					});
-					mediaSession.peerConnection.setRemoteDescription(
-							description, onSuccess, onFailure);
-				}
+					// SIP session has already ended
+					mediaSession.sipSession = null;
+					// Clean up everything else, then notify app
+					mediaSession.close();
+				};
+				var sdp = response.body;
+
+				console.log('Setting remote description');
+				// Update session streamConfig based on the answer
+				mediaSession.streamConfig = streamConfigFromSdp(
+						new CrocMSRP.Sdp.Session(sdp));
+				var description = new JsSIP.WebRTC.RTCSessionDescription({
+					type : 'answer',
+					sdp : sdp
+				});
+				mediaSession.peerConnection.setRemoteDescription(
+						description, onSuccess, onFailure);
 			}
 		});
 		sipSession.on('ended', function(event) {
@@ -386,7 +381,16 @@
 	}
 
 	function setRemoteStreamOutput(mediaSession) {
-		var stream = mediaSession.peerConnection.getRemoteStreams()[0];
+		var stream;
+		var pc = mediaSession.peerConnection;
+
+		if (pc.getRemoteStreams) {
+			// Latest spec uses a method
+			stream = pc.getRemoteStreams()[0];
+		} else {
+			// Older spec used a property (still used by Firefox 22)
+			stream = pc.remoteStreams[0];
+		}
 
 		if (mediaSession.remoteVideoElement) {
 			mediaSession.remoteVideoElement.src = window.URL.createObjectURL(stream);
@@ -512,7 +516,7 @@
 	 * @inner
 	 * @type {CrocSDK.MediaAPI~MediaSession}
 	 */
-	function MediaSession(mediaApi, sipSession, address) {
+	function MediaSession(mediaApi, sipSession, address, constraints) {
 		var croc = mediaApi.crocObject;
 		var iceServers = croc.iceServers;
 		if (croc.dynamicIceServers) {
@@ -528,8 +532,7 @@
 		this.state = mediaSessionState.PENDING;
 		this.peerConnection = new JsSIP.WebRTC.RTCPeerConnection({
 			iceServers : iceServers
-		}//, {mandatory: {DtlsSrtpKeyAgreement: true}}
-		);
+		}, constraints);
 		this.localStream = null;
 		this.remoteMediaReceived = false;
 		this.accepted = false;
@@ -661,10 +664,13 @@
 			if (this.sipSession.direction === 'incoming') {
 				getUserMedia(this, function() {
 					createAnswer(mediaSession, function() {
-						mediaSession.sipSession.answer({
-							sdp : mediaSession.peerConnection.localDescription.sdp
-						});
-						CrocSDK.Util.fireEvent(mediaSession, 'onConnect', {});
+						// Check that we haven't received a CANCEL in the meanwhile
+						if (mediaSession.state === mediaSessionState.PENDING) {
+							mediaSession.sipSession.answer({
+								sdp : mediaSession.peerConnection.localDescription.sdp
+							});
+							CrocSDK.Util.fireEvent(mediaSession, 'onConnect', {});
+						}
 					});
 				});
 				setRemoteStreamOutput(this);
@@ -1005,16 +1011,36 @@
 		var crocObject = this.crocObject;
 		var capabilityApi = crocObject.capability;
 		var sipSession = new JsSIP.RTCSession(crocObject.sipUA);
-		var mediaSession = new MediaSession(this, sipSession, address);
+		var watchData = capabilityApi.getWatchData(address);
 
 		if (!connectConfig) {
 			connectConfig = {};
 		}
 
+		var constraints = connectConfig.constraints || null;
+
+		// Force DTLS-SRTP if Chrome is calling Firefox.
+		// We don't turn this on by default to avoid problems with Asterisk.
+		if (watchData) {
+			if (/Chrome/.test(navigator.userAgent) &&
+					/Firefox/.test(watchData.userAgent)) {
+				if (!constraints) {
+					constraints = {};
+				}
+				if (!constraints.optional) {
+					constraints.optional = [];
+				}
+				constraints.optional.push({DtlsSrtpKeyAgreement: true});
+				console.log('Enabling DTLS for Firefox compatibility');
+			}
+		}
+
+		var mediaSession = new MediaSession(this, sipSession, address, constraints);
+
 		// Set MediaSession properties
 		mediaSession.customHeaders = connectConfig.customHeaders || {};
 		// Start with cached capabilities if we have them
-		mediaSession.capabilities = capabilityApi.getCapabilities(address);
+		mediaSession.capabilities = watchData ? watchData.capabilities : null;
 		mediaSession.streamConfig = connectConfig.streamConfig || defaultStreamConfig;
 
 		// Add SIP session event handlers

@@ -242,7 +242,8 @@ var CrocSDK = {};
 	function initJsSip(croc) {
 		// Override the reported User-Agent
 		if (JsSIP.C.USER_AGENT.indexOf('Crocodile') === -1) {
-			JsSIP.C.USER_AGENT = 'Crocodile SDK v<%= pkg.version %>; ' + JsSIP.C.USER_AGENT;
+			JsSIP.C.USER_AGENT = 'Crocodile SDK v<%= pkg.version %>; '.concat(
+					JsSIP.C.USER_AGENT, '; ', navigator.userAgent);
 		}
 
 		// Restructure sipProxySet as array of URIs

@@ -1370,6 +1370,8 @@ IncomingRequest.prototype.reply = function(code, reason, extraHeaders, body, onS
     response += extraHeaders[idx] +'\r\n';
   }
 
+  response += 'User-Agent: ' + JsSIP.C.USER_AGENT +'\r\n';
+
   if(body) {
     length = JsSIP.Utils.str_utf8_length(body);
     response += 'Content-Type: application/sdp\r\n';
@@ -1419,6 +1421,7 @@ IncomingRequest.prototype.reply_sl = function(code, reason) {
   response += 'From: ' + this.getHeader('From') + '\r\n';
   response += 'Call-ID: ' + this.call_id + '\r\n';
   response += 'CSeq: ' + this.cseq + ' ' + this.method + '\r\n';
+  response += 'User-Agent: ' + JsSIP.C.USER_AGENT +'\r\n';
   response += 'Content-Length: ' + 0 + '\r\n\r\n';
 
   this.transport.send(response);

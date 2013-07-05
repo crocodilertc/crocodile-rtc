@@ -21,6 +21,7 @@
 	function WatchData() {
 		this.status = null;
 		this.capabilities = null;
+		this.userAgent = null;
 	}
 
 	/**
@@ -128,6 +129,8 @@
 			var parsedContact = response.parseHeader('contact', 0);
 			watchData.capabilities = capabilityApi.parseFeatureTags(parsedContact.parameters);
 		}
+
+		watchData.userAgent = response.getHeader('user-agent');
 
 		var fireEvent = false;
 		if (previousStatus !== watchData.status) {
@@ -539,22 +542,15 @@
 	};
 
 	/**
-	 * <p>
 	 * Returns the cached watch {@link CrocSDK.CapabilityAPI~status status} for
 	 * <code>address</code>.
-	 * </p>
 	 * <p>
 	 * Returns <code>null</code> if <code>address</code> is not on the watch
 	 * list or if a capabilities query response for <code>address</code> has
 	 * not yet been received.
-	 * </p>
-	 * <p>
-	 * Exceptions: TypeError, {@link CrocSDK.Exceptions#ValueError ValueError}
-	 * </p>
 	 * 
-	 * @param {String}
-	 *            address The address to refresh in the watch List.
-	 * @returns {CrocSDK.Croc~Capabilities} Capabilities
+	 * @param {String} address - The target address.
+	 * @returns {CrocSDK.CapabilityAPI~status} watchStatus
 	 */
 	CrocSDK.CapabilityAPI.prototype.getWatchStatus = function(address) {
 		var watchData = this.watchDataCache[address];
@@ -564,6 +560,20 @@
 		}
 
 		return null;
+	};
+
+	/**
+	 * Retrieves all cached data for <code>address</code>.
+	 * <p>
+	 * Returns <code>null</code> if <code>address</code> is not on the watch
+	 * list.
+	 * 
+	 * @private
+	 * @param {String} address - The target address.
+	 * @returns The cached watch data
+	 */
+	CrocSDK.CapabilityAPI.prototype.getWatchData = function(address) {
+		return this.watchDataCache[address] || null;
 	};
 
 	/**
