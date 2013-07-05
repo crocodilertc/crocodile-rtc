@@ -879,6 +879,47 @@
 	 * be accessed as <code>crocObject.media.connect</code>.
 	 * </p>
 	 * 
+	 * <p>
+	 * An example using the Media API: 
+	 *   <pre>
+	 *   <code>
+	 *   // Basic API configuration
+	 *   var crocObject = $.croc({
+	 *     apiKey: "API_KEY_GOES_HERE",
+	 *     onConnected: function () {
+	 *       // Some code
+	 *     },
+	 *   
+	 *     // Media API configuration
+	 *     media: {
+	 *       // Optional parameters (with default values)
+	 *       acceptTimeout: 30,
+	 *   
+	 *       // Optional event handlers
+	 *       onSession: function(event) {
+	 *         // Handle new incoming session
+	 *       }
+	 *     }
+	 *   });
+	 *   
+	 *   // Basic audio session set-up example
+	 *   function startCall(address) {
+	 *     var session = crocObject.media.connect(address);
+	 *     session.remoteAudioElement = $('#audio');
+	 *     session.onProvisional = function (event) {
+	 *     $('#state').html('Ringing');
+	 *     };
+	 *     session.onConnect = function (event) {
+	 *       $('#state').html('Connected');
+	 *     };
+	 *     session.onClose = function (event) {
+	 *       $('#state').html('Disconnected');
+	 *     };
+	 *   }
+	 *   </code>
+	 *   </pre>
+	 * </p>
+	 * 
 	 * @constructor
 	 * @param {CrocSDK.Croc} crocObject - The parent {@link CrocSDK.Croc Croc}
 	 * object.

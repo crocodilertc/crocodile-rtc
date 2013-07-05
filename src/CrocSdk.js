@@ -627,6 +627,20 @@ var CrocSDK = {};
 	 * will be through the created instance.
 	 * </p>
 	 * 
+	 * <p>
+	 * An example of instantiating the Crocodile RTC JavaScript Library:
+	 *   <pre>
+	 *   <code>
+	 *     var crocObject = $.croc({
+	 *       apiKey: "API_KEY_GOES_HERE",
+	 *       onConnected: function () {
+	 *         // Some code
+	 *       }
+	 *     });
+	 *   </code>
+	 *   </pre>
+	 * </p>
+	 * 
 	 * @constructor
 	 * @param {CrocSDK~Config} config - A configuration object containing any
 	 * properties/event handlers you wish to configure; any that are not
@@ -634,6 +648,7 @@ var CrocSDK = {};
 	 * <p>
 	 * To use the Crocodile network, you must at least provide the
 	 * <code>apiKey</code> property.
+	 * </p>
 	 */
 	CrocSDK.Croc = function(config) {
 		var croc = this;
@@ -1012,6 +1027,28 @@ var CrocSDK = {};
 	 */
 	// Type Definitions
 	/**
+	 * <p>
+	 * A {@link CrocSDK.Croc~Capabilities Capabilities} object is a plain 
+	 * Javascript object, but with the key names matching the capabilities 
+	 * defined in {@link CrocSDK.Croc~Capabilities Capabilities}. For instance,
+	 * with the default values defined in that section, the 
+	 * {@link CrocSDK.Croc~Capabilities Capabilities} object for a 
+	 * WebRTC-capable browser with a webcam, and on the Crocodile network, 
+	 * would be as follows:
+	 *   <pre>
+	 *   <code>
+	 *     {
+	 *       "sip.audio": true,
+	 *       "sip.data": true,
+	 *       "sip.text": true,
+	 *       "sip.video": true,
+	 *       "croc.sdkversion": "1.0",
+	 *       "custom.myNameSpace: 'nameSpaceContent'"
+	 *     }
+	 *   </code>
+	 *   </pre>
+	 * </p> 
+	 *
 	 * @memberof CrocSDK.Croc
 	 * @typedef CrocSDK.Croc~Capabilities
 	 * @property {Boolean} [sip.audio=detected] <code>true</code> if the

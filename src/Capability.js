@@ -221,6 +221,30 @@
 	 * <code>crocObject.capability.refreshPeriod</code>.
 	 * </p>
 	 * 
+	 * <p>
+	 * An example using the Capability API:
+	 *   <pre>
+	 *   <code>
+	 *     var crocObject = $.croc({
+	 *       apiKey: "API_KEY_GOES_HERE",
+	 *       onConnected: function () {
+	 *         // Some code
+	 *       },
+	 *       
+	 *       capability: {
+	 *         refreshPeriod: 15,
+	 *         onWatch: function(event) {
+	 *           // Some code
+	 *         },
+	 *         onWatchChange: function(event) {
+	 *           // Some code
+	 *         }
+	 *       }
+	 *     });
+	 *   </code>
+	 *   </pre>
+	 * </p>
+	 * 
 	 * @constructor
 	 * @memberof CrocSDK
 	 * @param {CrocSDK.Croc} crocObject - The parent Croc object
