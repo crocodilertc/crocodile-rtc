@@ -482,4 +482,123 @@
 		// QUnit will restart once the second croc object has disconnected
 	});
 
+	QUnit.asyncTest("Simple re-INVITE", 5, function(assert) {
+		var croc1 = $.croc(config1);
+		var croc2 = $.croc(config2);
+		// Give up if the test has hung for too long
+		var hungTimerId = setTimeout(function() {
+			assert.ok(false, 'Aborting hung test');
+			croc1.disconnect();
+			croc2.disconnect();
+		}, 30000);
+
+		croc2.media.onMediaSession = function (event) {
+			var session = event.session;
+			assert.ok(true, 'onMediaSession fired');
+
+			// Accept the session
+			session.accept();
+
+			// Clean up the croc objects when the session closes
+			session.onClose = function () {
+				assert.ok(true, 'callee onClose event fired');
+				clearTimeout(hungTimerId);
+				croc1.disconnect();
+				croc2.disconnect();
+			};
+		};
+
+		// Wait for receiver to register before sending the data
+		croc2.onRegistered = function () {
+			var session = croc1.media.connect(config2.address);
+
+			session.onConnect = function () {
+				assert.ok(true, 'caller onConnect fired');
+				// Send a re-INVITE a short while later
+				setTimeout(function () {
+					// Not intended to be a public method
+					session._sendReinvite();
+					assert.ok(true, 're-INVITE sent');
+				}, 2000);
+				// Close a fixed time after connecting
+				setTimeout(function () {
+					assert.ok(true, 'Timer fired - closing session');
+					session.close();
+				}, 4000);
+			};
+		};
+
+		// QUnit will restart once the second croc object has disconnected
+	});
+
+	QUnit.asyncTest("Multiple sequential re-INVITEs", 8, function(assert) {
+		var croc1 = $.croc(config1);
+		var croc2 = $.croc(config2);
+		// Give up if the test has hung for too long
+		var hungTimerId = setTimeout(function() {
+			assert.ok(false, 'Aborting hung test');
+			croc1.disconnect();
+			croc2.disconnect();
+		}, 40000);
+		var session1, session2;
+
+		croc2.media.onMediaSession = function (event) {
+			session2 = event.session;
+			assert.ok(true, 'onMediaSession fired');
+
+			// Accept the session
+			session2.accept();
+
+			// Clean up the croc objects when the session closes
+			session2.onClose = function () {
+				assert.ok(true, 'callee onClose event fired');
+				clearTimeout(hungTimerId);
+				croc1.disconnect();
+				croc2.disconnect();
+			};
+		};
+
+		// Wait for receiver to register before sending the data
+		croc2.onRegistered = function () {
+			session1 = croc1.media.connect(config2.address);
+
+			session1.onConnect = function () {
+				assert.ok(true, 'caller onConnect fired');
+				// Schedule following re-INVITEs
+				// Assumes the re-INVITEs are quick (no ICE)
+				setTimeout(function () {
+					// Not intended to be a public method
+					console.log('session2 sending re-INVITE', Date.now());
+					session2._sendReinvite();
+					assert.ok(true, 're-INVITE 1 sent');
+				}, 2000);
+				setTimeout(function () {
+					// Not intended to be a public method
+					console.log('session2 sending re-INVITE', Date.now());
+					session2._sendReinvite();
+					assert.ok(true, 're-INVITE 2 sent');
+				}, 4000);
+				setTimeout(function () {
+					// Not intended to be a public method
+					console.log('session1 sending re-INVITE', Date.now());
+					session1._sendReinvite();
+					assert.ok(true, 're-INVITE 3 sent');
+				}, 6000);
+				setTimeout(function () {
+					// Not intended to be a public method
+					console.log('session1 sending re-INVITE', Date.now());
+					session1._sendReinvite();
+					assert.ok(true, 're-INVITE 4 sent');
+				}, 8000);
+				// Close a fixed time after connecting
+				setTimeout(function () {
+					assert.ok(true, 'Timer fired - closing session');
+					session1.close();
+				}, 10000);
+			};
+		};
+
+		// QUnit will restart once the second croc object has disconnected
+	});
+
 }(jQuery));

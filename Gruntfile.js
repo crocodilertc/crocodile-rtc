@@ -43,6 +43,7 @@ module.exports = function(grunt) {
           'src/Data.js',
           'src/Exceptions.js',
           'src/Media.js',
+          'src/MediaSession.js',
           'src/MsrpDataSession.js',
           'src/SipDataSession.js',
           'src/Util.js',
