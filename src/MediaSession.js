@@ -830,7 +830,6 @@
 				var onSuccess = function() {
 					console.log('Remote answer set');
 					self._setRemoteStreamOutput();
-					CrocSDK.Util.fireEvent(self, 'onRenegotiateResponse', {});
 				};
 				var onFailure = function(error) {
 					console.warn('setRemoteDescription failed:', error);
@@ -866,6 +865,7 @@
 
 		data.reinvite.on('completed', function () {
 			self.offerOutstanding = false;
+			CrocSDK.Util.fireEvent(self, 'onRenegotiateComplete', {});
 		});
 	};
 
@@ -1436,15 +1436,16 @@
 	 */
 
 	/**
-	 * This event is dispatched when the remote party has accepted a
-	 * renegotiation request (including the special cases of hold/resume
-	 * renegotiations).
+	 * This event is dispatched when a renegotiation completes (including the
+	 * special cases of hold/resume renegotiations).  The event fires
+	 * regardless of which party started the renegotiation, thus indicating that
+	 * it is possible to start a new renegotiation if required.
 	 * <p>
 	 * If this event is not handled the Crocodile RTC JavaScript Library will
 	 * complete the renegotiation process automatically.
 	 * 
 	 * @memberof CrocSDK.MediaAPI~MediaSession
-	 * @event CrocSDK.MediaAPI~MediaSession#onRenegotiateResponse
+	 * @event CrocSDK.MediaAPI~MediaSession#onRenegotiateComplete
 	 */
 
 	/**
