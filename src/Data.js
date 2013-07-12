@@ -369,8 +369,8 @@
 			this.msrpDataSessions.push(session);
 
 			var fileTransferInfo = null;
-			if (mLine.attributes['file-selector']) {
-				var fileParams = CrocMSRP.Sdp.parseFileAttributes(mLine);
+			var fileParams = mLine.parseFileAttributes();
+			if (fileParams) {
 				fileTransferInfo = {
 					name : fileParams.selector.name,
 					description : fileParams.description,

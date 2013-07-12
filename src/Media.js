@@ -1,11 +1,4 @@
 (function(CrocSDK) {
-	var defaultStreamConfig = {
-		audio : {
-			send : true,
-			receive : true
-		}
-	};
-
 	/**
 	 * <p>
 	 * The media features of the Crocodile RTC JavaScript Library allow a
@@ -218,7 +211,7 @@
 		mediaSession.customHeaders = connectConfig.customHeaders || {};
 		// Start with cached capabilities if we have them
 		mediaSession.capabilities = watchData ? watchData.capabilities : null;
-		mediaSession.streamConfig = connectConfig.streamConfig || defaultStreamConfig;
+		mediaSession.streamConfig = connectConfig.streamConfig || new CrocSDK.StreamConfig();
 
 		mediaSession._connect();
 
@@ -278,9 +271,11 @@
 	 * @memberof CrocSDK.MediaAPI
 	 * @typedef CrocSDK.MediaAPI~StreamConfig
 	 * @property {CrocSDK.MediaAPI~StreamDirections} audio The audio stream
-	 *           configuration.
+	 * configuration. Set to <code>null</code> if there is no audio stream in
+	 * the session.
 	 * @property {CrocSDK.MediaAPI~StreamDirections} video The video stream
-	 *           configuration.
+	 * configuration. Set to <code>null</code> if there is no video stream in
+	 * the session.
 	 */
 
 	/**

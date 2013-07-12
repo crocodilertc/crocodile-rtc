@@ -45,6 +45,7 @@ module.exports = function(grunt) {
           'src/Media.js',
           'src/MediaSession.js',
           'src/MsrpDataSession.js',
+          'src/Sdp.js',
           'src/SipDataSession.js',
           'src/Util.js',
           'src/XmppDataSession.js',

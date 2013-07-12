@@ -402,7 +402,7 @@ var CrocSDK = {};
 
 				// JsSIP has not yet processed the SDP
 				// Examine SDP to distinguish between data and media sessions
-				var sdp = new CrocMSRP.Sdp.Session(data.request.body);
+				var sdp = new CrocSDK.Sdp.Session(data.request.body);
 				if (!sdp) {
 					// SDP parsing failed
 					data.sdpInvalid();

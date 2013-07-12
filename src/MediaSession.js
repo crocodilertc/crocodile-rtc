@@ -8,7 +8,7 @@
 	var allowedMediaTypes = [ 'audio', 'video' ];
 
 	function fixLocalDescription(sessionDescription, streamConfig) {
-		var parsedSdp = new CrocMSRP.Sdp.Session(sessionDescription.sdp);
+		var parsedSdp = new CrocSDK.Sdp.Session(sessionDescription.sdp);
 		var directions = [ 'sendrecv', 'sendonly', 'recvonly', 'inactive' ];
 		var oldDirection, newDirection;
 		var sdpChanged = false;
@@ -184,47 +184,86 @@
 	function streamConfigFromSdp(sdp) {
 		var streamConfig = {};
 
-		for ( var i = 0, len = sdp.media.length; i < len; i++) {
+		for (var i = 0, len = sdp.media.length; i < len; i++) {
 			var mLine = sdp.media[i];
 			for ( var index in allowedMediaTypes) {
 				var type = allowedMediaTypes[index];
 				if (mLine.media === type && mLine.port !== 0) {
 					// Remember that our send/receive settings are the inverse
-					// of what we receive in the SDP offer.
-					if ('sendrecv' in mLine.attributes) {
-						streamConfig[type] = {
-							send : true,
-							receive : true
-						};
-					} else if ('sendonly' in mLine.attributes) {
-						streamConfig[type] = {
-							send : false,
-							receive : true
-						};
-					} else if ('recvonly' in mLine.attributes) {
-						streamConfig[type] = {
-							send : true,
-							receive : false
-						};
-					} else if ('inactive' in mLine.attributes) {
-						streamConfig[type] = {
-							send : false,
-							receive : false
-						};
-					} else {
-						// Defaults to sendrecv (assuming we're not
-						// conferencing)
-						streamConfig[type] = {
-							send : true,
-							receive : true
-						};
-					}
+					// of what we receive in the remote party's SDP.
+					streamConfig[type] = {
+						send: mLine.isReceiving(),
+						receive: mLine.isSending()
+					};
 				}
 			}
 		}
 
-		return streamConfig;
+		return new CrocSDK.StreamConfig(streamConfig);
 	}
+
+	CrocSDK.StreamConfig = function (config) {
+		if (config) {
+			for (var i = 0, len = allowedMediaTypes.length; i < len; i++) {
+				var type = allowedMediaTypes[i];
+				if (config[type]) {
+					this[type] = config[type];
+				} else {
+					this[type] = null;
+				}
+			}
+		} else {
+			// Default to a bi-directional audio session
+			this.audio = {send: true, receive: true};
+		}
+	};
+	CrocSDK.StreamConfig.prototype.isSending = function () {
+		for (var i = 0, len = allowedMediaTypes.length; i < len; i++) {
+			var type = allowedMediaTypes[i];
+			if (this[type].send) {
+				return true;
+			}
+		}
+		return false;
+	};
+	CrocSDK.StreamConfig.prototype.getSendingStreams = function () {
+		var streams = [];
+		for (var i = 0, len = allowedMediaTypes.length; i < len; i++) {
+			var type = allowedMediaTypes[i];
+			if (this[type] && this[type].send) {
+				streams.push(type);
+			}
+		}
+		return streams;
+	};
+	/**
+	 * Updates the stream config to be on-hold (not receiving any streams) and
+	 * returns the streams that were being received.
+	 * @returns {Array.<String>} The streams previously being received.
+	 */
+	CrocSDK.StreamConfig.prototype.hold = function () {
+		var streams = [];
+		for (var i = 0, len = allowedMediaTypes.length; i < len; i++) {
+			var type = allowedMediaTypes[i];
+			if (this[type] && this[type].receive) {
+				streams.push(type);
+				this[type].receive = false;
+			}
+		}
+		return streams;
+	};
+	/**
+	 * Takes the stream config off-hold by resuming the provided streams.
+	 * @param {Array.<String>} streams - The streams previously being received.
+	 */
+	CrocSDK.StreamConfig.prototype.resume = function (streams) {
+		for (var i = 0, len = allowedMediaTypes.length; i < len; i++) {
+			var type = allowedMediaTypes[i];
+			if (this[type] && streams.indexOf(type) !== -1) {
+				this[type].receive = true;
+			}
+		}
+	};
 
 	/**
 	 * MediaSession object constructor. Though the constructor is private, the
@@ -284,6 +323,10 @@
 		this.remoteMediaReceived = false;
 		this.accepted = false;
 		this.offerOutstanding = false;
+		this.remoteHold = false;
+		this.remoteHoldStreams = null;
+		this.localHold = false;
+		this.localHoldStreams = null;
 
 		// Public properties
 		/**
@@ -459,14 +502,15 @@
 	 * complete. Runs callback with completed offer.
 	 * 
 	 * @private
-	 * @param mediaSession
-	 *            The MediaSession object for which we are creating an offer.
+	 * @param streamConfig
+	 * The MediaSession object for which we are creating an offer.
 	 * @param onSuccess
-	 *            Callback to execute when the SDP offer is complete.
+	 * Callback to execute when the SDP offer is complete.
 	 */
-	CrocSDK.MediaSession.prototype._createOffer = function (onSuccess) {
-		var mediaSession = this;
+	CrocSDK.MediaSession.prototype._createOffer = function (streamConfig, onSuccess) {
+		var self = this;
 		var pc = this.peerConnection;
+		var sc = streamConfig || this.streamConfig;
 
 		var setLocalSuccess = function() {
 			console.log('Local description set, ice gathering state:', pc.iceGatheringState);
@@ -479,19 +523,18 @@
 		};
 		var setLocalFailure = function(error) {
 			console.warn('setLocalDescription failed:', error);
-			mediaSession.close();
+			self.close();
 		};
 		var offerSuccess = function(sessionDescription) {
 			console.log('Offer created');
 			// We've got a template offer, set it as the local description
-			fixLocalDescription(sessionDescription, mediaSession.streamConfig);
+			fixLocalDescription(sessionDescription, sc);
 			pc.setLocalDescription(sessionDescription, setLocalSuccess, setLocalFailure);
 		};
 		var offerFailure = function(error) {
 			console.warn('createOffer failed:', error);
-			mediaSession.close();
+			self.close();
 		};
-		var sc = this.streamConfig;
 
 		// These constraints can add m-lines for streams that we have not added
 		// to the PeerConnection, in case we want to receive but not send.
@@ -610,7 +653,7 @@
 		var crocObject = this.mediaApi.crocObject;
 		var capabilityApi = crocObject.capability;
 
-		this._createOffer(function() {
+		this._createOffer(null, function() {
 			var sipOptions = {};
 			sipOptions.sdp = self.peerConnection.localDescription.sdp;
 			sipOptions.extraHeaders = CrocSDK.Util.getExtraHeaders(
@@ -632,15 +675,10 @@
 	/**
 	 * @private
 	 */
-	CrocSDK.MediaSession.prototype._sendReinvite = function () {
+	CrocSDK.MediaSession.prototype._sendReinvite = function (streamConfig) {
 		var self = this;
 
-		if (this.offerOutstanding) {
-			throw new CrocSDK.Exceptions.StateError('Existing renegotiation still in progress');
-		}
-		this.offerOutstanding = true;
-
-		this._createOffer(function() {
+		this._createOffer(streamConfig, function() {
 			self.sipSession.sendReinvite({
 				sdp: self.peerConnection.localDescription.sdp
 			});
@@ -715,7 +753,7 @@
 			console.log('Setting remote description');
 			// Update session streamConfig based on the answer
 			this.streamConfig = streamConfigFromSdp(
-					new CrocMSRP.Sdp.Session(sdp));
+					new CrocSDK.Sdp.Session(sdp));
 			var description = new JsSIP.WebRTC.RTCSessionDescription({
 				type : 'answer',
 				sdp : sdp
@@ -737,29 +775,47 @@
 			this.offerOutstanding = true;
 
 			var rawSdp = data.sdp;
-			var parsedSdp = new CrocMSRP.Sdp.Session(rawSdp);
+			var parsedSdp = new CrocSDK.Sdp.Session(rawSdp);
 
 			if (!parsedSdp) {
 				data.reinvite.sdpInvalid();
 			}
 
-//			var streamConfig = streamConfigFromSdp(parsedSdp);
+			var streamConfig = streamConfigFromSdp(parsedSdp);
 
-			// TODO: Reject any unacceptable stream changes early on
+			// Reject any unacceptable stream changes early on - checking this
+			// before altering the PeerConnection state avoids having to
+			// terminate the session (due to lack of PeerConnection rollback
+			// feature).
+			// Remember to allow remote party to take us off hold.
+			// TODO
 
 			var sessionDesc = new JsSIP.WebRTC.RTCSessionDescription({
 				type: 'offer',
 				sdp: rawSdp
 			});
 			var onSuccess = function () {
+				var oldStreamConfig = self.streamConfig;
 				console.log('Remote offer set');
 				data.reinvite.sdpValid();
+
 				// TODO: Confirm significant stream changes with the application/user
+				self.streamConfig = streamConfig;
 				self._createAnswer(function () {
 					data.reinvite.accept({
 						sdp: self.peerConnection.localDescription.sdp
 					});
 				});
+
+				// Notify the application about hold/resume events
+				if (parsedSdp.isHeld() && oldStreamConfig.isSending()) {
+					self.remoteHold = true;
+					self.remoteHoldStreams = oldStreamConfig.getSendingStreams();
+					CrocSDK.Util.fireEvent(self, 'onHold', {});
+				} else if (self.remoteHold && !parsedSdp.isHeld()) {
+					self.remoteHold = false;
+					CrocSDK.Util.fireEvent(self, 'onResume', {});
+				}
 			};
 			var onFailure = function(error) {
 				console.warn('setRemoteDescription failed:', error);
@@ -774,6 +830,7 @@
 				var onSuccess = function() {
 					console.log('Remote answer set');
 					self._setRemoteStreamOutput();
+					CrocSDK.Util.fireEvent(self, 'onRenegotiateResponse', {});
 				};
 				var onFailure = function(error) {
 					console.warn('setRemoteDescription failed:', error);
@@ -790,7 +847,7 @@
 				console.log('Setting remote description');
 				// Update session streamConfig based on the answer
 				self.streamConfig = streamConfigFromSdp(
-						new CrocMSRP.Sdp.Session(sdp));
+						new CrocSDK.Sdp.Session(sdp));
 				var description = new JsSIP.WebRTC.RTCSessionDescription({
 					type : 'answer',
 					sdp : sdp
@@ -840,7 +897,11 @@
 		var mediaSession = this;
 
 		if (config) {
-			this.streamConfig = config;
+			if (config instanceof CrocSDK.StreamConfig) {
+				this.streamConfig = config;
+			} else {
+				this.streamConfig = new CrocSDK.StreamConfig(config);
+			}
 		}
 
 		if (this.state === mediaSessionState.PENDING) {
@@ -862,6 +923,81 @@
 			}
 		} else {
 			throw new CrocSDK.Exceptions.StateError('Session cannot be accepted in state', this.state);
+		}
+	};
+
+	/**
+	 * Put the session on-hold. Media streams are renegotiated to
+	 * &#34;sendonly&#34; to stop inbound media, and local media is muted.
+	 * <p>
+	 * Note: due to current limitations of WebRTC, if the renegotiation fails
+	 * the session will be closed.
+	 * 
+	 * @memberof CrocSDK.MediaAPI~MediaSession
+	 * @function CrocSDK.MediaAPI~MediaSession#hold
+	 * @throws {CrocSDK.Exceptions#StateError} If a renegotiation is already in progress.
+	 */
+	CrocSDK.MediaSession.prototype.hold = function() {
+		if (this.localHold) {
+			// Don't need to do anything
+			return;
+		}
+		if (this.offerOutstanding) {
+			throw new CrocSDK.Exceptions.StateError('Existing renegotiation still in progress');
+		}
+		this.localHold = true;
+		this.offerOutstanding = true;
+
+		// Mute all local streams
+		var videoTracks = this.localStream.getVideoTracks();
+		var audioTracks = this.localStream.getAudioTracks();
+		var allTracks = videoTracks.concat(audioTracks);
+		for (var i = 0, len = allTracks.length; i < len; i++) {
+			allTracks[i].enabled = false;
+		}
+
+		// Request that the remote party stop sending all streams
+		var newStreamConfig = new CrocSDK.StreamConfig(this.streamConfig);
+		this.localHoldStreams = newStreamConfig.hold();
+		this._sendReinvite(newStreamConfig);
+	};
+
+	/**
+	 * Resume an on-hold session. Media streams are renegotiated with the
+	 * configuration that was in effect before <code>hold()</code> was called
+	 * and the local media is unmuted.
+	 * <p>
+	 * Note: due to current limitations of WebRTC, if the renegotiation fails
+	 * the session will be closed.
+	 * 
+	 * Exceptions: {@link CrocSDK.Exceptions#StateError StateError}
+	 * 
+	 * @memberof CrocSDK.MediaAPI~MediaSession
+	 * @function CrocSDK.MediaAPI~MediaSession#resume
+	 * @throws {CrocSDK.Exceptions#StateError} If the session is not on
+	 * hold, or if a renegotiation is already in progress.
+	 */
+	CrocSDK.MediaSession.prototype.resume = function() {
+		if (!this.localHold) {
+			// Don't need to do anything
+			return;
+		}
+		if (this.offerOutstanding) {
+			throw new CrocSDK.Exceptions.StateError('Existing renegotiation still in progress');
+		}
+		this.offerOutstanding = true;
+
+		// Request that the remote party resumes sending media
+		var newStreamConfig = new CrocSDK.StreamConfig(this.streamConfig);
+		newStreamConfig.resume(this.localHoldStreams);
+		this._sendReinvite(newStreamConfig);
+
+		// Unmute the local media
+		var videoTracks = this.localStream.getVideoTracks();
+		var audioTracks = this.localStream.getAudioTracks();
+		var allTracks = videoTracks.concat(audioTracks);
+		for (var i = 0, len = allTracks.length; i < len; i++) {
+			allTracks[i].enabled = true;
 		}
 	};
 
@@ -1087,11 +1223,6 @@
 
 	/**
 	 * @memberof CrocSDK.MediaAPI~MediaSession
-	 * @typedef CrocSDK.MediaAPI~MediaSession~OnHoldEvent
-	 */
-
-	/**
-	 * @memberof CrocSDK.MediaAPI~MediaSession
 	 * @typedef CrocSDK.MediaAPI~MediaSession~OnRenegotiateRequestEvent
 	 * @property {CrocSDK.MediaAPI~CustomHeaders} customHeaders
 	 *           <p>
@@ -1112,13 +1243,6 @@
 	 * </p>
 	 * @property {CrocSDK.MediaAPI~StreamConfig} streamConfig The configuration
 	 *           for the renegotiated media stream.
-	 */
-
-	/**
-	 * @memberof CrocSDK.MediaAPI~MediaSession
-	 * @typedef CrocSDK.MediaAPI~MediaSession~OnRenegotiateResponseEvent
-	 * @property {Boolean} accepted Set to <code>true</code> if the remote
-	 *           party accepted the renegotiation request.
 	 */
 
 	/**
@@ -1217,33 +1341,6 @@
 
 	/**
 	 * <p>
-	 * Put the session on-hold. Media streams are renegotiated to
-	 * &#34;sendonly&#34; to stop inbound media and local media is muted.
-	 * </p>
-	 * 
-	 * <p>
-	 * Exceptions: {@link CrocSDK.Exceptions#StateError StateError}
-	 * </p>
-	 * 
-	 * @memberof CrocSDK.MediaAPI~MediaSession
-	 * @function CrocSDK.MediaAPI~MediaSession#hold
-	 */
-
-	/**
-	 * <p>
-	 * Resume an on-hold session. Media streams are renegotiated with the
-	 * configuration that was in effect before <code>hold()</code> was called
-	 * and the local media is unmuted.
-	 * </p>
-	 * 
-	 * Exceptions: {@link CrocSDK.Exceptions#StateError StateError}
-	 * 
-	 * @memberof CrocSDK.MediaAPI~MediaSession
-	 * @function CrocSDK.MediaAPI~MediaSession#resume
-	 */
-
-	/**
-	 * <p>
 	 * Put the session on-hold (if not already) and perform a blind-transfer to
 	 * transfer the remote party to <code>address</code>.
 	 * </p>
@@ -1295,20 +1392,29 @@
 	// Documented Events
 
 	/**
-	 * <p>
-	 * This event is dispatched when the remote party is attempting to put the
+	 * This event is dispatched when the remote party has requested to put the
 	 * session on hold.
-	 * </p>
-	 * 
+	 * <p>
+	 * Note that local and remote hold are independent - if the remote party
+	 * puts the session on hold, the local party cannot reverse the action by
+	 * calling the <code>resume()</code> method.
 	 * <p>
 	 * The session will automatically go on hold whether this event is handled
 	 * or not.
-	 * </p>
 	 * 
 	 * @memberof CrocSDK.MediaAPI~MediaSession
 	 * @event CrocSDK.MediaAPI~MediaSession#onHold
-	 * @param {CrocSDK.MediaAPI~MediaSession~OnHoldEvent}
-	 *            [onHoldEvent] The event object associated to this event.
+	 */
+
+	/**
+	 * This event is dispatched when the remote party has requested to resume
+	 * the session, having previously placed it on hold.
+	 * <p>
+	 * The session will automatically resume whether this event is handled or
+	 * not.
+	 * 
+	 * @memberof CrocSDK.MediaAPI~MediaSession
+	 * @event CrocSDK.MediaAPI~MediaSession#onResume
 	 */
 
 	/**
@@ -1330,21 +1436,15 @@
 	 */
 
 	/**
-	 * <p>
-	 * This event is dispatched when the remote party has accepted or rejected a
-	 * renegotiation request.
-	 * </p>
-	 * 
+	 * This event is dispatched when the remote party has accepted a
+	 * renegotiation request (including the special cases of hold/resume
+	 * renegotiations).
 	 * <p>
 	 * If this event is not handled the Crocodile RTC JavaScript Library will
 	 * complete the renegotiation process automatically.
-	 * </p>
 	 * 
 	 * @memberof CrocSDK.MediaAPI~MediaSession
 	 * @event CrocSDK.MediaAPI~MediaSession#onRenegotiateResponse
-	 * @param {CrocSDK.MediaAPI~MediaSession~OnRenegotiateResponseEvent}
-	 *            [onRenegotiateResponseEvent] The event object associated to
-	 *            this event.
 	 */
 
 	/**

@@ -85,9 +85,9 @@
 			croc1.disconnect();
 			croc2.disconnect();
 		}, 60000);
-		var defaultStreams = {
+		var defaultStreams = new CrocSDK.StreamConfig({
 			audio: {send: true, receive: true}
-		};
+		});
 		var provisionalFired = false;
 
 		croc2.media.onMediaSession = function (event) {
@@ -164,12 +164,12 @@
 			croc1.disconnect();
 			croc2.disconnect();
 		}, 60000);
-		var callerStreams = {
+		var callerStreams = new CrocSDK.StreamConfig({
 			audio: {send: true, receive: false}
-		};
-		var calleeStreams = {
+		});
+		var calleeStreams = new CrocSDK.StreamConfig({
 			audio: {send: false, receive: true}
-		};
+		});
 		var provisionalFired = false;
 
 		croc2.media.onMediaSession = function (event) {
@@ -234,12 +234,12 @@
 			croc1.disconnect();
 			croc2.disconnect();
 		}, 60000);
-		var callerStreams = {
+		var callerStreams = new CrocSDK.StreamConfig({
 			audio: {send: false, receive: true}
-		};
-		var calleeStreams = {
+		});
+		var calleeStreams = new CrocSDK.StreamConfig({
 			audio: {send: true, receive: false}
-		};
+		});
 		var provisionalFired = false;
 
 		croc2.media.onMediaSession = function (event) {
@@ -307,13 +307,13 @@
 			croc1.disconnect();
 			croc2.disconnect();
 		}, 60000);
-		var requestStreams = {
+		var requestStreams = new CrocSDK.StreamConfig({
 			audio: {send: true, receive: true},
 			video: {send: true, receive: true}
-		};
-		var acceptStreams = {
+		});
+		var acceptStreams = new CrocSDK.StreamConfig({
 			audio: {send: true, receive: true}
-		};
+		});
 		var provisionalFired = false;
 
 		croc2.media.onMediaSession = function (event) {
@@ -384,9 +384,9 @@
 			croc2.disconnect();
 			croc3.disconnect();
 		}, 60000);
-		var defaultStreams = {
+		var defaultStreams = new CrocSDK.StreamConfig({
 			audio: {send: true, receive: true}
-		};
+		});
 		var provisionalFired = false;
 		var forkSessions = [];
 		var callerSession;
@@ -595,6 +595,109 @@
 					assert.ok(true, 'Timer fired - closing session');
 					session1.close();
 				}, 10000);
+			};
+		};
+
+		// QUnit will restart once the second croc object has disconnected
+	});
+
+	QUnit.asyncTest("Hold/Resume", 16, function(assert) {
+		var croc1 = $.croc(config1);
+		var croc2 = $.croc(config2);
+		// Give up if the test has hung for too long
+		var hungTimerId = setTimeout(function() {
+			assert.ok(false, 'Aborting hung test');
+			croc1.disconnect();
+			croc2.disconnect();
+		}, 40000);
+		var requestStreams = new CrocSDK.StreamConfig({
+			audio: {send: true, receive: true},
+			video: {send: true, receive: true}
+		});
+		var localHoldStreams = new CrocSDK.StreamConfig({
+			audio: {send: true, receive: false},
+			video: {send: true, receive: false}
+		});
+		var remoteHoldStreams = new CrocSDK.StreamConfig({
+			audio: {send: false, receive: true},
+			video: {send: false, receive: true}
+		});
+		var numRenegotiations = 0;
+
+		croc2.media.onMediaSession = function (event) {
+			var session = event.session;
+			assert.ok(true, 'onMediaSession fired');
+			assert.deepEqual(session.streamConfig, requestStreams,
+					'Expected callee initial streams');
+
+			// Accept the session
+			session.accept();
+
+			session.onHold = function () {
+				assert.ok(true, 'onHold fired');
+				assert.deepEqual(session.streamConfig, remoteHoldStreams,
+						'Expected callee hold streams');
+			};
+
+			session.onResume = function () {
+				assert.ok(true, 'onResume fired');
+				assert.deepEqual(session.streamConfig, requestStreams,
+						'Expected callee resume streams');
+			};
+
+			// Clean up the croc objects when the session closes
+			session.onClose = function () {
+				assert.ok(true, 'callee onClose event fired');
+				clearTimeout(hungTimerId);
+				croc1.disconnect();
+				croc2.disconnect();
+			};
+		};
+
+		// Wait for receiver to register before sending the data
+		croc2.onRegistered = function () {
+			var session = croc1.media.connect(config2.address, {
+				streamConfig: requestStreams
+			});
+
+			session.onConnect = function () {
+				assert.ok(true, 'caller onConnect fired');
+				assert.deepEqual(session.streamConfig, requestStreams,
+						'Expected caller initial streams');
+				// Put the call on hold a short while later
+				setTimeout(function () {
+					session.hold();
+					assert.ok(true, 'hold requested');
+				}, 2000);
+			};
+
+			session.onRenegotiateResponse = function () {
+				numRenegotiations++;
+				switch (numRenegotiations) {
+				case 1:
+					assert.ok(true, 'hold successful');
+					assert.deepEqual(session.streamConfig, localHoldStreams,
+							'Expected caller hold streams');
+					// Resume the call a short while later
+					setTimeout(function () {
+						session.resume();
+						assert.ok(true, 'resume requested');
+					}, 2000);
+					break;
+				case 2:
+					assert.ok(true, 'resume successful');
+					assert.deepEqual(session.streamConfig, requestStreams,
+					'Expected caller resume streams');
+					// Close the session a short while later
+					setTimeout(function () {
+						assert.ok(true, 'Timer fired - closing session');
+						session.close();
+					}, 2000);
+					break;
+				default:
+					assert.ok(false, 'unexpected renegotiation');
+					break;
+				}
 			};
 		};
 
