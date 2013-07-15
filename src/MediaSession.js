@@ -999,6 +999,8 @@
 		for (var i = 0, len = allTracks.length; i < len; i++) {
 			allTracks[i].enabled = true;
 		}
+
+		this.localHold = false;
 	};
 
 	/**
