@@ -98,7 +98,7 @@
 			assert.strictEqual(session.address, config1.address, 'Expected remote address');
 			assert.strictEqual(session.displayName, config1.displayName, 'Expected remote name');
 			assert.deepEqual(session.streamConfig, defaultStreams, 'Expected streams');
-			assert.deepEqual(session.customHeaders, {}, 'Expected custom headers');
+			assert.ok(session.customHeaders.isEmpty(), 'Expected custom headers');
 			assert.deepEqual(session.capabilities, croc1.capabilities, 'Expected capabilities');
 
 			// Check that expected events fire
@@ -180,7 +180,7 @@
 			assert.strictEqual(session.address, config1.address, 'Expected remote address');
 			assert.strictEqual(session.displayName, config1.displayName, 'Expected remote name');
 			assert.deepEqual(session.streamConfig, calleeStreams, 'Expected streams');
-			assert.deepEqual(session.customHeaders, {}, 'Expected custom headers');
+			assert.ok(session.customHeaders.isEmpty(), 'Expected custom headers');
 			assert.deepEqual(session.capabilities, croc1.capabilities, 'Expected capabilities');
 
 			// Accept the session, then close after a fixed time
@@ -250,7 +250,7 @@
 			assert.strictEqual(session.address, config1.address, 'Expected remote address');
 			assert.strictEqual(session.displayName, config1.displayName, 'Expected remote name');
 			assert.deepEqual(session.streamConfig, calleeStreams, 'Expected streams');
-			assert.deepEqual(session.customHeaders, {}, 'Expected custom headers');
+			assert.ok(session.customHeaders.isEmpty(), 'Expected custom headers');
 			assert.deepEqual(session.capabilities, croc1.capabilities, 'Expected capabilities');
 
 			// Accept the session, then close after a fixed time
@@ -324,7 +324,7 @@
 			assert.strictEqual(session.address, config1.address, 'Expected remote address');
 			assert.strictEqual(session.displayName, config1.displayName, 'Expected remote name');
 			assert.deepEqual(session.streamConfig, requestStreams, 'Expected request streams');
-			assert.deepEqual(session.customHeaders, {}, 'Expected custom headers');
+			assert.ok(session.customHeaders.isEmpty(), 'Expected custom headers');
 			assert.deepEqual(session.capabilities, croc1.capabilities, 'Expected capabilities');
 
 			// Accept the session, then close after a fixed time

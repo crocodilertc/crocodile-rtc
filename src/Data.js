@@ -19,7 +19,7 @@
 
 			// Start with cached capabilities if we have them
 			session.capabilities = capabilityApi.getCapabilities(address);
-			session.customHeaders = sendConfig.customHeaders || {};
+			session.customHeaders = new CrocSDK.CustomHeaders(sendConfig.customHeaders);
 
 			if (!dataApi.checkSessionsIntervalId) {
 				dataApi.checkSessionsIntervalId = window.setInterval(function() {
@@ -382,7 +382,7 @@
 			// We're happy with the SDP, send provisional response now
 			sdpValid();
 
-			if (!session.customHeaders && !fileTransferInfo) {
+			if (session.customHeaders.isEmpty() && !fileTransferInfo) {
 				// Add it as a reusable session for this address
 				this.reusableMsrpDataSessions[session.address] = session;
 			}
@@ -427,7 +427,7 @@
 
 			// Set the new session properties
 			dataSession.capabilities = caps;
-			dataSession.customHeaders = CrocSDK.Util.getCustomHeaders(request);
+			dataSession.customHeaders = new CrocSDK.CustomHeaders(request);
 			dataSession.displayName = displayName;
 
 			if (!this.checkSessionsIntervalId) {
@@ -464,7 +464,7 @@
 		} else {
 			// Update session properties
 			dataSession.capabilities = caps;
-			dataSession.customHeaders = CrocSDK.Util.getCustomHeaders(request);
+			dataSession.customHeaders = new CrocSDK.CustomHeaders(request);
 			dataSession.displayName = displayName;
 		}
 
@@ -763,7 +763,7 @@
 	 * {@link CrocSDK.MsrpDataSession~DataSession#send DataSession.send()} as it
 	 * is only relevant when establishing new sessions/transfers.
 	 * </p>
-	 * @property {CrocSDK.DataAPI~CustomHeaders} customHeaders
+	 * @property {CrocSDK~CustomHeaders} customHeaders
 	 *           <p>
 	 *           This enables the web-app to specify custom headers that will be
 	 *           included in the session creation request. The key names
@@ -859,37 +859,6 @@
 	 *           If file details are not provided (for example, this is an
 	 *           instant messaging session) this property will be
 	 *           <code>null</code>.
-	 */
-
-	/**
-	 * <p>
-	 * The {@link CrocSDK.DataAPI~CustomHeaders CustomHeaders} object can be used 
-	 * to define headers to send in an outbound session request. Likewise, if any 
-	 * custom headers are found in an inbound session request, these are available
-	 * to the application in the same format.
-	 * </p>
-	 * 
-	 * <p>
-	 * There are no prescribed properties on a 
-	 * {@link CrocSDK.DataAPI~CustomHeaders CustomHeaders} object. Each
-	 * property name that exists in the object will be mapped to a header name
-	 * in the request, and each property value will be used as the associated
-	 * header value.
-	 * </p>
-	 * 
-	 * All custom header keys <b><i>MUST</i></b> start with &#34;X-&#34;.
-	 * Keys that do not start &#34;X-&#34; will be ignored.
-	 * 
-	 * When specifying custom headers to send, the header name can be provided
-	 * with any chosen capitalisation, as long as it only uses valid characters
-	 * (sticking to alphanumeric characters and dashes is recommended). However,
-	 * the names of received custom headers are always provided in a specific
-	 * format: with only the first character, and the first character following
-	 * a dash, in uppercase. For instance, a header sent as
-	 * &#34;x-lowercase&#34; will be received as &#34;X-Lowercase&#34;.
-	 * 
-	 * @memberof CrocSDK.DataAPI
-	 * @typedef CrocSDK.DataAPI~CustomHeaders
 	 */
 
 	/**

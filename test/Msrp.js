@@ -136,10 +136,10 @@
 		}, 10000);
 
 		// Can't use underscore in header names, as JsSIP converts to dash
-		var testCustomHeaders = {
+		var testCustomHeaders = new CrocSDK.CustomHeaders({
 				"X-Foo": 'bar',
 				"X-Test-.!%*+`'~0123456789": 'Yee-ha!'
-		};
+		});
 
 		// Set up the receiver's event handlers
 		croc2.data.onDataSession = function (event) {
@@ -252,7 +252,7 @@
 			assert.ok(true, 'onDataSession fired');
 			
 			// Check incoming session properties
-			assert.deepEqual(event.session.customHeaders, {}, 
+			assert.ok(event.session.customHeaders.isEmpty(), 
 					'Incoming session customHeaders correct');
 			assert.deepEqual(event.session.capabilities, croc1.capabilities, 
 					'Incoming session data capability correct');
@@ -819,12 +819,12 @@
 		}, 10000);
 		
 		// Can't use underscore in header names, as JsSIP converts to dash
-		var sessionCustomHeaders = {
+		var sessionCustomHeaders = new CrocSDK.CustomHeaders({
 				"X-Foo": 'bar'
-		};
-		var session2CustomHeaders = {
+		});
+		var session2CustomHeaders = new CrocSDK.CustomHeaders({
 				"X-Test-.!%*+`'~0123456789": 'Yee-ha!'
-		};
+		});
 		
 		// Set up the receiver's event handlers
 		croc2.data.onDataSession = function (event) {

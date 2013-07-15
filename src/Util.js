@@ -82,58 +82,6 @@
 		}
 	};
 
-	CrocSDK.Util.isValidCustomHeader = function (name, value) {
-		var token = /[^a-zA-Z0-9\-\.!%\*_\+`'~]/;
-		if (name.slice(0, 2).toUpperCase() !== 'X-') {
-			return false;
-		}
-
-		if (name.match(token)) {
-			return false;
-		}
-		
-		if (!CrocSDK.Util.isType(value, 'string')) {
-			return false;
-		}
-		
-		// Though they can be valid, ban new lines/carriage returns for safety
-		if (value.match(/[\r\n]/)) {
-			return false;
-		}
-
-		return true;
-	};
-
-	CrocSDK.Util.getExtraHeaders = function (customHeaders) {
-		var extraHeaders = [];
-		
-		// Convert our custom header format to JsSIP's
-		for (var header in customHeaders) {
-			var value = customHeaders[header];
-	
-			if (CrocSDK.Util.isValidCustomHeader(header, value)) {
-				extraHeaders.push(header + ': ' + value);
-			} else {
-				console.warn('Ignored invalid custom header:', header, value);
-			}
-		}
-		
-		return extraHeaders;
-	};
-
-	CrocSDK.Util.getCustomHeaders = function (sipRequest) {
-		var customHeaders = {};
-		
-		for (var name in sipRequest.headers) {
-			if (name.slice(0, 2).toUpperCase() === 'X-') {
-				// We only grab the first instance of a given header name
-				customHeaders[name] = sipRequest.headers[name][0].raw;
-			}
-		}
-
-		return customHeaders;
-	};
-
 	CrocSDK.Util.websocketCauseToSdkStatus = function (cause) {
 		switch (cause) {
 		case 1000:

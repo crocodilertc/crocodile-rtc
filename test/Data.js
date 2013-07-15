@@ -200,10 +200,10 @@
 		}, 10000);
 		// Have to specify NS to satisfy equality assertion
 		var strData = '<strong xmlns="http://www.w3.org/1999/xhtml">XMPP test message</strong> ' + new Date();
-		var testCustomHeaders = {
+		var testCustomHeaders = new CrocSDK.CustomHeaders({
 				"X-Foo": 'bar',
 				"X-Test-.!%*+`'~0123456789": 'Yee-ha!'
-		};
+		});
 
 		croc2.data.onDataSession = function(event) {
 			assert.ok(true, 'onDataSession event fired');

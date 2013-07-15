@@ -614,7 +614,7 @@
 		 * 
 		 * @member CrocSDK.MsrpDataSession~customHeaders
 		 * @instance
-		 * @type {CrocSDK.DataAPI~CustomHeaders}
+		 * @type {CrocSDK~CustomHeaders}
 		 */
 		this.customHeaders = null;
 		/**
@@ -1019,7 +1019,11 @@
 		var capabilityApi = crocObject.capability;
 
 		this.init(dataApi, address);
-		this.customHeaders = sendConfig.customHeaders || {};
+		if (sendConfig.customHeaders instanceof CrocSDK.CustomHeaders) {
+			this.customHeaders = sendConfig.customHeaders;
+		} else {
+			this.customHeaders = new CrocSDK.CustomHeaders(sendConfig.customHeaders);
+		}
 		// Start with cached capabilities if we have them
 		this.capabilities = capabilityApi.getCapabilities(address);
 
@@ -1065,7 +1069,7 @@
 
 			var sipOptions = {
 				eventHandlers : sipEventHandlers,
-				extraHeaders : CrocSDK.Util.getExtraHeaders(sendConfig.customHeaders),
+				extraHeaders : dataSession.customHeaders.toExtraHeaders(),
 				featureTags : capabilityApi.createFeatureTags(crocObject.capabilities),
 				sdp : dataSession.msrpSession.getSdpOffer()
 			};
@@ -1105,7 +1109,7 @@
 		this.init(dataApi, sipSession.remote_identity.uri.toAor().replace(/^sip:/, ''));
 		this.sipSession = sipSession;
 		this.displayName = sipSession.remote_identity.display_name;
-		this.customHeaders = CrocSDK.Util.getCustomHeaders(sipRequest);
+		this.customHeaders = new CrocSDK.CustomHeaders(sipRequest);
 		// Process remote capabilities
 		var parsedContactHeader = sipRequest.parseHeader('contact', 0);
 		this.capabilities = capabilityApi.parseFeatureTags(parsedContactHeader.parameters);

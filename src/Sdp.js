@@ -617,14 +617,14 @@
 	};
 	CrocSDK.Sdp.Media.prototype.parseFileAttributes = function () {
 		var fileParams = {}, position = 0, selector = {},
-			colonIndex, name, value, endIndex,
-			fileSelectorString = this.attributes['file-selector'][0];
+			colonIndex, name, value, endIndex;
 
 		if (!this.attributes['file-selector']) {
 			return null;
 		}
 
 		// Separate the file-selector components
+		var fileSelectorString = this.attributes['file-selector'][0];
 		while (position < fileSelectorString.length) {
 			if (fileSelectorString.charAt(position) === ' ') {
 				position++;
@@ -659,8 +659,7 @@
 					}
 					endIndex++;
 				}
-				value = new CrocSDK.ContentType();
-				value.parseSdpTypeSelector(fileSelectorString.slice(position, endIndex));
+				value = fileSelectorString.slice(position, endIndex);
 				position = endIndex + 1;
 			} else {
 				// Grab everything until the next space

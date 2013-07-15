@@ -111,7 +111,7 @@
 
 			// Set MediaSession properties
 			mediaSession.displayName = sipSession.remote_identity.display_name;
-			mediaSession.customHeaders = CrocSDK.Util.getCustomHeaders(sipRequest);
+			mediaSession.customHeaders = new CrocSDK.CustomHeaders(sipRequest);
 			// Process remote capabilities
 			var parsedContactHeader = sipRequest.parseHeader('contact', 0);
 			mediaSession.capabilities = capabilityApi
@@ -208,7 +208,7 @@
 		var mediaSession = new CrocSDK.MediaSession(this, sipSession, address, constraints);
 
 		// Set MediaSession properties
-		mediaSession.customHeaders = connectConfig.customHeaders || {};
+		mediaSession.customHeaders = new CrocSDK.CustomHeaders(connectConfig.customHeaders);
 		// Start with cached capabilities if we have them
 		mediaSession.capabilities = watchData ? watchData.capabilities : null;
 		mediaSession.streamConfig = connectConfig.streamConfig || new CrocSDK.StreamConfig();
@@ -242,19 +242,8 @@
 	/**
 	 * @memberof CrocSDK.MediaAPI
 	 * @typedef CrocSDK.MediaAPI~ConnectConfig
-	 * @property {CrocSDK.DataAPI~CustomHeaders} customHeaders
-	 *           <p>
-	 *           This enables the web-app to specify custom headers that will be
-	 *           included in the session creation request. The key names
-	 *           provided will be used as the header names and the associated
-	 *           String values will be used as the header values.
-	 *           </p>
-	 * 
-	 * <p>
-	 * All custom header keys <b>MUST</b> start with &#34;X-&#34;. Keys that do
-	 * not start &#34;X-&#34; will be ignored.
-	 * </p>
-	 * 
+	 * @property {CrocSDK~CustomHeaders} customHeaders
+	 * Custom headers that to include in the session creation request.
 	 * <p>
 	 * These custom headers will be available to the local and remote party in
 	 * the
@@ -262,7 +251,6 @@
 	 * property and to the remote party in the
 	 * {@link CrocSDK.MediaAPI~MediaSession~OnRenegotiateRequestEvent OnRenegotiateRequestEvent.customHeaders}
 	 * property during session renegotiation.
-	 * </p>
 	 * @property {CrocSDK.MediaAPI~StreamConfig} streamConfig The media stream
 	 *           configuration.
 	 */
