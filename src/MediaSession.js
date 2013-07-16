@@ -750,7 +750,9 @@
 						});
 					};
 
-					if (self.streamConfig.sendingStreamsEqual(oldStreamConfig)) {
+					if (self.remoteHold ||
+							self.streamConfig.sendingStreamsEqual(oldStreamConfig)) {
+						// Don't need to update user media
 						answer();
 					} else {
 						self._getUserMedia(null, answer);
@@ -766,8 +768,8 @@
 					CrocSDK.Util.fireEvent(self, 'onHold', {});
 				} else if (self.remoteHold && streamConfig.isSending()) {
 					// Remote resume
-					self.remoteHold = false;
 					accept();
+					self.remoteHold = false;
 					CrocSDK.Util.fireEvent(self, 'onResume', {});
 				} else {
 					// Generic renegotiation

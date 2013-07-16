@@ -55,7 +55,7 @@
 	CrocSDK.StreamConfig.prototype.isSending = function () {
 		for (var i = 0, len = allowedMediaTypes.length; i < len; i++) {
 			var type = allowedMediaTypes[i];
-			if (this[type].send) {
+			if (this[type] && this[type].send) {
 				return true;
 			}
 		}
