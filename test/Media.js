@@ -833,4 +833,164 @@
 		// QUnit will restart once the second croc object has disconnected
 	});
 
+	QUnit.asyncTest("Media upgrade/downgrade", 30, function(assert) {
+		var croc1 = $.croc(config1);
+		var croc2 = $.croc(config2);
+		// Give up if the test has hung for too long
+		var hungTimerId = setTimeout(function() {
+			assert.ok(false, 'Aborting hung test');
+			croc1.disconnect();
+			croc2.disconnect();
+		}, 60000);
+		var audioOnly = new CrocSDK.StreamConfig({
+			audio: {send: true, receive: true}
+		});
+		var sendVideo = new CrocSDK.StreamConfig({
+			audio: {send: true, receive: true},
+			video: {send: true, receive: false}
+		});
+		var sendrecvVideo = new CrocSDK.StreamConfig({
+			audio: {send: true, receive: true},
+			video: {send: true, receive: true}
+		});
+		var recvVideo = new CrocSDK.StreamConfig({
+			audio: {send: true, receive: true},
+			video: {send: false, receive: true}
+		});
+		var numRenegotiations = 0;
+		var session1, session2;
+		var expectAccept = true;
+
+		// User 1 requests audio call
+		// User 1 adds local video
+		// User 2 adds local video
+		// User 1 removes local video
+		// User 2 removes local video
+		// User 1 attempts to add bi-directional video
+
+		// Uses the default onRenegotiateRequest handler, so "safe" changes
+		// should be allowed automatically.
+
+		croc2.media.onMediaSession = function (event) {
+			session2 = event.session;
+			assert.ok(true, 'onMediaSession fired');
+			assert.deepEqual(session2.streamConfig, audioOnly,
+					'Expected callee initial streams');
+
+			// Accept the session
+			session2.accept();
+
+			session2.onRenegotiateResponse = function (event) {
+				assert.strictEqual(event.accepted, expectAccept, 'Expected result');
+			};
+		};
+
+		// Wait for receiver to register before sending the data
+		croc2.onRegistered = function () {
+			session1 = croc1.media.connect(config2.address, {
+				streamConfig: audioOnly
+			});
+
+			session1.onConnect = function () {
+				assert.ok(true, 'caller onConnect fired');
+				assert.deepEqual(session1.streamConfig, audioOnly,
+						'Expected caller initial streams');
+				// Add local video a short while later
+				setTimeout(function () {
+					session1.renegotiate({
+						streamConfig: sendVideo
+					});
+					assert.ok(true, 'session1 upgrade requested');
+				}, 2000);
+			};
+
+			// Clean up the croc objects when the session closes
+			session1.onClose = function () {
+				assert.ok(true, 'caller onClose event fired');
+				clearTimeout(hungTimerId);
+				croc1.disconnect();
+				croc2.disconnect();
+			};
+
+			session1.onRenegotiateResponse = function (event) {
+				assert.strictEqual(event.accepted, expectAccept, 'Expected result');
+			};
+
+			session1.onRenegotiateComplete = function () {
+				numRenegotiations++;
+				switch (numRenegotiations) {
+				case 1:
+					assert.ok(true, 'session1 upgrade complete');
+					assert.deepEqual(session1.streamConfig, sendVideo,
+							'Expected caller streams');
+					assert.deepEqual(session2.streamConfig, recvVideo,
+							'Expected callee streams');
+					// Next the other party adds their video
+					setTimeout(function () {
+						session2.renegotiate({
+							streamConfig: sendrecvVideo
+						});
+						assert.ok(true, 'session2 upgrade requested');
+					}, 2000);
+					break;
+				case 2:
+					assert.ok(true, 'session2 upgrade complete');
+					assert.deepEqual(session1.streamConfig, sendrecvVideo,
+							'Expected caller streams');
+					assert.deepEqual(session2.streamConfig, sendrecvVideo,
+							'Expected callee streams');
+					// Next the first party removes local video
+					setTimeout(function () {
+						session1.renegotiate({
+							streamConfig: recvVideo
+						});
+						assert.ok(true, 'session1 downgrade requested');
+					}, 2000);
+					break;
+				case 3:
+					assert.ok(true, 'session1 downgrade complete');
+					assert.deepEqual(session1.streamConfig, recvVideo,
+							'Expected caller streams');
+					assert.deepEqual(session2.streamConfig, sendVideo,
+							'Expected callee streams');
+					// Then the other party removes their video
+					setTimeout(function () {
+						session2.renegotiate({
+							streamConfig: audioOnly
+						});
+						assert.ok(true, 'session2 downgrade requested');
+					}, 2000);
+					break;
+				case 4:
+					assert.ok(true, 'session2 downgrade complete');
+					assert.deepEqual(session1.streamConfig, audioOnly,
+							'Expected caller streams');
+					assert.deepEqual(session2.streamConfig, audioOnly,
+							'Expected callee streams');
+					// Now the first party attempts to add bi-directional video
+					setTimeout(function () {
+						session1.renegotiate({
+							streamConfig: sendrecvVideo
+						});
+						assert.ok(true, 'bi-directional video requested');
+						expectAccept = false;
+					}, 2000);
+					break;
+				case 5:
+					assert.ok(true, 'session1 upgrade attempt complete');
+					assert.deepEqual(session1.streamConfig, audioOnly,
+							'Expected caller streams');
+					assert.deepEqual(session2.streamConfig, audioOnly,
+							'Expected callee streams');
+					break;
+				default:
+					assert.ok(false, 'unexpected renegotiation');
+					break;
+				}
+			};
+		};
+
+		// QUnit will restart once the second croc object has disconnected
+	});
+
 }(jQuery));

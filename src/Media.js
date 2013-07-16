@@ -1,23 +1,16 @@
 (function(CrocSDK) {
 	/**
-	 * <p>
 	 * The media features of the Crocodile RTC JavaScript Library allow a
 	 * web-app to exchange media (for example, audio or video streams) with
 	 * other instances connected to the Crocodile RTC Network.
-	 * </p>
-	 * 
 	 * <p>
 	 * Once the {@link CrocSDK.Croc Croc} Object is instantiated it will contain
 	 * an instance of the {@link CrocSDK.MediaAPI Media} object named
 	 * <code>media</code>.
-	 * </p>
-	 * 
 	 * <p>
 	 * For example, given a {@link CrocSDK.Croc Croc} Object named
 	 * <code>crocObject</code> the <code>Media.connect</code> method would
 	 * be accessed as <code>crocObject.media.connect</code>.
-	 * </p>
-	 * 
 	 * <p>
 	 * An example using the Media API: 
 	 *   <pre>
@@ -57,7 +50,6 @@
 	 *   }
 	 *   </code>
 	 *   </pre>
-	 * </p>
 	 * 
 	 * @constructor
 	 * @param {CrocSDK.Croc} crocObject - The parent {@link CrocSDK.Croc Croc}
@@ -71,9 +63,7 @@
 	};
 
 	/**
-	 * <p>
 	 * Process an incoming request to establish a media session.
-	 * </p>
 	 * 
 	 * @private
 	 * @param sipSession
@@ -152,30 +142,22 @@
 	 */
 
 	/**
-	 * <p>
 	 * Initiate a media session to <code>address</code>. Defaults to a
 	 * bi-directional audio session unless specified otherwise using the
 	 * <code>config</code> parameter.
-	 * </p>
-	 * 
 	 * <p>
 	 * Returns a {@link CrocSDK.MediaAPI~MediaSession MediaSession} object which
 	 * the required event handlers should be registered with immediately to
 	 * avoid missing events.
-	 * </p>
 	 * 
-	 * <p>
-	 * Exceptions: TypeError, {@link CrocSDK.Exceptions#ValueError ValueError},
-	 * {@link CrocSDK.Exceptions#VersionError VersionError},
-	 * {@link CrocSDK.Exceptions#StateError StateError}
-	 * </p>
-	 * 
-	 * @param {String}
-	 *            address The address to establish a
-	 *            {@link CrocSDK.MediaAPI Media} connnection to.
-	 * @param {CrocSDK.MediaAPI~ConnectConfig}
-	 *            connectConfig Optional configuration properties.
+	 * @param {String} address - The target address for the media session.
+	 * @param {CrocSDK.MediaAPI~ConnectConfig} [connectConfig]
+	 * Optional configuration properties.
 	 * @returns CrocSDK.MediaAPI~MediaSession
+	 * @throws {TypeError}
+	 * @throws {CrocSDK.Exceptions#ValueError}
+	 * @throws {CrocSDK.Exceptions#VersionError}
+	 * @throws {CrocSDK.Exceptions#StateError}
 	 */
 	CrocSDK.MediaAPI.prototype.connect = function(address, connectConfig) {
 		var crocObject = this.crocObject;
@@ -220,14 +202,7 @@
 	};
 
 	/**
-	 * <p>
-	 * Explicitly close all current media sessions.
-	 * </p>
-	 * 
-	 * <p>
-	 * Exceptions: <i>none</i>
-	 * </p>
-	 * 
+	 * Closes all current media sessions.
 	 */
 	CrocSDK.MediaAPI.prototype.close = function() {
 		for ( var i = 0, len = this.mediaSessions.length; i < len; i++) {
@@ -277,37 +252,29 @@
 
 	/**
 	 * @memberof CrocSDK.MediaAPI
-	 * @typedef CrocSDK.MediaAPI~OnMediaSessionEvent
-	 * @property {CrocSDK.MediaAPI~MediaSession} session The
-	 *           {@link CrocSDK.MediaAPI~MediaSession MediaSession} representing
-	 *           the inbound session.
+	 * @typedef CrocSDK.MediaAPI~MediaSessionEvent
+	 * @property {CrocSDK.MediaAPI~MediaSession} session
+	 * The MediaSession object representing the inbound session.
 	 */
 
 	// Documented Events
 
 	/**
-	 * <p>
 	 * Dispatched when Crocodile RTC JavaScript Library receives a request 
 	 * for a new session from another party on the Crocodile RTC Network.
-	 * </p>
-	 * 
 	 * <p>
 	 * An instance of Crocodile RTC JavaScript Library cannot receive inbound
 	 * sessions unless the <code>register</code> property was set to
 	 * <code>true</code> when the {@link CrocSDK.Croc Croc} Object was
 	 * instantiated.
-	 * </p>
-	 * 
 	 * <p>
 	 * If this event is not handled the Crocodile RTC JavaScript Library will
 	 * automatically reject inbound sessions.
-	 * </p>
 	 * 
 	 * @memberof CrocSDK.MediaAPI
 	 * @event CrocSDK.MediaAPI#onMediaSession
-	 * @param {CrocSDK.MediaAPI~OnMediaSessionEvent}
-	 *            [onMediaSessionEvent] The event object associated to this
-	 *            event.
+	 * @param {CrocSDK.MediaAPI~MediaSessionEvent}
+	 * [event] The event object associated with this event.
 	 */
 
 }(CrocSDK));

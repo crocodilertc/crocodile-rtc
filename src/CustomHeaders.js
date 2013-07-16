@@ -24,13 +24,15 @@
 	 * @memberof CrocSDK
 	 * @typedef CrocSDK~CustomHeaders
 	 */
-	CrocSDK.CustomHeaders = function (customHeaders) {
-		if (customHeaders instanceof JsSIP.IncomingRequest) {
-			this.fromSipRequest(customHeaders);
-		} else if (customHeaders) {
+	CrocSDK.CustomHeaders = function (input) {
+		if (input instanceof JsSIP.IncomingRequest) {
+			this.fromJsSipHeaders(input.headers);
+		} else if (input instanceof JsSIP.OutgoingRequest) {
+			this.fromExtraHeaders(input.extraHeaders);
+		} else if (input) {
 			var name, value;
-			for (name in customHeaders) {
-				value = customHeaders[name];
+			for (name in input) {
+				value = input[name];
 				if (this.isValidCustomHeader(name, value)) {
 					this[name] = value;
 				} else {
@@ -79,16 +81,33 @@
 		return true;
 	};
 
-	CrocSDK.CustomHeaders.prototype.fromSipRequest = function (sipRequest) {
-		for (var name in sipRequest.headers) {
+	CrocSDK.CustomHeaders.prototype.fromJsSipHeaders = function (headers) {
+		for (var name in headers) {
 			if (name.slice(0, 2).toUpperCase() === 'X-') {
 				// We only grab the first instance of a given header name
-				var value = sipRequest.headers[name][0].raw;
+				var value = headers[name][0].raw;
 				if (this.isValidCustomHeader(name, value)) {
 					this[name] = value;
 				} else {
 					console.warn('Ignored custom header:', name, value);
 				}
+			}
+		}
+	};
+
+	/**
+	 * Processes an array of "extra headers" as used by JsSIP.
+	 * @private
+	 */
+	CrocSDK.CustomHeaders.prototype.fromExtraHeaders = function (extraHeaders) {
+		for (var i = 0, len = extraHeaders.length; i < len; i++) {
+			var header = extraHeaders[i];
+			var match = header.match(/([^:]*)\s*:\s*(.*)/);
+			var name = match[1];
+			var value = match[2];
+			if (name.slice(0, 2).toUpperCase() === 'X-' &&
+					this.isValidCustomHeader(name, value)) {
+				this[name] = value;
 			}
 		}
 	};

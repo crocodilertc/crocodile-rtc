@@ -5,13 +5,24 @@
 		if (config instanceof CrocSDK.Sdp.Session) {
 			this.fromSdp(config);
 		} else if (config) {
+			var addedStream = false;
+
+			if (typeof config !== 'object') {
+				throw new TypeError('Unexpected streamConfig type: ' + typeof config);
+			}
+
 			for (var i = 0, len = allowedMediaTypes.length; i < len; i++) {
 				var type = allowedMediaTypes[i];
 				if (config[type]) {
 					this[type] = config[type];
+					addedStream = true;
 				} else {
 					this[type] = null;
 				}
+			}
+
+			if (!addedStream) {
+				throw new CrocSDK.Exceptions.ValueError('No allowed streams found');
 			}
 		} else {
 			// Default to a bi-directional audio session
@@ -107,13 +118,17 @@
 			if (typeof this[type] !== typeof streamConfig[type]) {
 				return false;
 			}
-			if (this[type]) {
+			if (this[type] && streamConfig[type]) {
 				if (this[type].send !== streamConfig[type].send) {
 					return false;
 				}
 				if (this[type].receive !== streamConfig[type].receive) {
 					return false;
 				}
+			} else if (this[type]) {
+				return false;
+			} else if (streamConfig[type]) {
+				return false;
 			}
 		}
 		return true;
@@ -135,8 +150,34 @@
 			if (typeof this[type] !== typeof streamConfig[type]) {
 				return false;
 			}
-			if (this[type]) {
+			if (this[type] && streamConfig[type]) {
 				if (this[type].send !== streamConfig[type].send) {
+					return false;
+				}
+			} else if (this[type]) {
+				return false;
+			} else if (streamConfig[type]) {
+				return false;
+			}
+		}
+		return true;
+	};
+
+	/**
+	 * Test for 'safety' (in terms of privacy) of a stream configuration change.
+	 * A change is considered safe if it does not request additional media
+	 * streams to be sent by the local party (the remote party may send
+	 * additional streams if they wish).
+	 * @param {CrocSDK.StreamConfig} newStreamConfig - The StreamConfig object
+	 * representing the new configuration.
+	 * @returns {Boolean} <code>true</code> if the changes are safe,
+	 * <code>false</code> otherwise.
+	 */
+	CrocSDK.StreamConfig.prototype.isSafeChange = function (newStreamConfig) {
+		for (var i = 0, len = allowedMediaTypes.length; i < len; i++) {
+			var type = allowedMediaTypes[i];
+			if (newStreamConfig[type] && newStreamConfig[type].send) {
+				if (!this[type] || !this[type].send) {
 					return false;
 				}
 			}
