@@ -326,6 +326,7 @@
 			mediaSession.close(status);
 		});
 		sipSession.on('reinvite', this._handleReinvite.bind(this));
+		sipSession.on('refresh', this._handleRefresh.bind(this));
 	};
 
 	/**
@@ -854,6 +855,18 @@
 			}
 			CrocSDK.Util.fireEvent(self, 'onRenegotiateComplete', {});
 		});
+	};
+
+	/**
+	 * Handles "refresh" events from JsSIP.
+	 * @private
+	 */
+	CrocSDK.MediaSession.prototype._handleRefresh = function () {
+		if (this.sipSession.isMethodAllowed(JsSIP.C.UPDATE, false)) {
+			this.sipSession.sendUpdate();
+		} else {
+			this._sendReinvite();
+		}
 	};
 
 	/*

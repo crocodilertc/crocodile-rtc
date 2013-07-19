@@ -286,7 +286,8 @@ JsSIP.C= {
     NO_ACK:                   'No ACK',
     USER_DENIED_MEDIA_ACCESS: 'User Denied Media Access',
     BAD_MEDIA_DESCRIPTION:    'Bad Media Description',
-    RTP_TIMEOUT:              'RTP Timeout'
+    RTP_TIMEOUT:              'RTP Timeout',
+    SESSION_TIMER:            'Session Timer Expired'
   },
 
   SIP_ERROR_CAUSES: {
@@ -904,6 +905,28 @@ function parseHeader(message, data, headerStart, headerEnd) {
       message.setHeader('proxy-authenticate', headerValue);
       parsed = message.parseHeader('proxy-authenticate');
       break;
+    case 'session-expires':
+    case 'x':
+      message.setHeader('session-expires', headerValue);
+      parsed = message.parseHeader('session-expires');
+      break;
+    case 'min-se':
+      message.setHeader('min-se', headerValue);
+      parsed = message.parseHeader('min-se');
+      break;
+    case 'supported':
+    case 'k':
+      message.setHeader('supported', headerValue);
+      parsed = message.parseHeader('supported');
+      break;
+    case 'require':
+      message.setHeader('require', headerValue);
+      parsed = message.parseHeader('require');
+      break;
+    case 'allow':
+      message.setHeader('allow', headerValue);
+      parsed = message.parseHeader('allow');
+      break;
     default:
       // Do not parse this header.
       message.setHeader(headerName, headerValue);
@@ -1026,7 +1049,8 @@ OutgoingRequest = function(method, ruri, ua, params, extraHeaders, body) {
     to,
     from,
     call_id,
-    cseq;
+    cseq,
+    extra_extensions;
 
   params = params || {};
 
@@ -1086,6 +1110,10 @@ OutgoingRequest = function(method, ruri, ua, params, extraHeaders, body) {
   cseq = params.cseq || Math.floor(Math.random() * 10000);
   this.cseq = cseq;
   this.setHeader('cseq', cseq + ' ' + method);
+
+  // Supported
+  extra_extensions = params.extra_extensions || '';
+  this.setHeader('supported', JsSIP.UA.C.SUPPORTED + extra_extensions);
 };
 
 OutgoingRequest.prototype = {
@@ -1113,7 +1141,6 @@ OutgoingRequest.prototype = {
       msg += this.extraHeaders[idx] +'\r\n';
     }
 
-    msg += 'Supported: ' +  JsSIP.UA.C.SUPPORTED +'\r\n';
     msg += 'User-Agent: ' + JsSIP.C.USER_AGENT +'\r\n';
 
     if(this.body) {
@@ -2458,7 +2485,9 @@ var Dialog,
   C = {
     // Dialog states
     STATUS_EARLY:       1,
-    STATUS_CONFIRMED:   2
+    STATUS_CONFIRMED:   2,
+
+    DEFAULT_MIN_SE: 90
   };
 
 // RFC 3261 12.1
@@ -2514,6 +2543,14 @@ Dialog = function(session, message, type, state) {
     this.route_set = message.getHeaderAll('record-route').reverse();
   }
 
+  // Session timer state (RFC 4028)
+  this.session_timer = {
+      localRefresher: true,
+      interval: null,
+      min_interval: C.DEFAULT_MIN_SE,
+      timer_id: null
+  };
+
   this.session = session;
   session.ua.dialogs[this.id.toString()] = this;
   console.log(LOG_PREFIX +'new ' + type + ' dialog created with status ' + (this.state === C.STATUS_EARLY ? 'EARLY': 'CONFIRMED'));
@@ -2537,6 +2574,7 @@ Dialog.prototype = {
 
   terminate: function() {
     console.log(LOG_PREFIX +'dialog ' + this.id.toString() + ' deleted');
+    this.clearSessionRefreshTimer();
     delete this.session.ua.dialogs[this.id.toString()];
   },
 
@@ -2555,6 +2593,22 @@ Dialog.prototype = {
 
     cseq = (method === JsSIP.C.CANCEL || method === JsSIP.C.ACK) ? this.local_seqnum : this.local_seqnum += 1;
 
+    // Add Session Timer headers (RFC 4028)
+    if (method === JsSIP.C.INVITE || method === JsSIP.C.UPDATE) {
+      var min_se = this.session_timer.min_interval;
+      var interval = this.session_timer.interval;
+
+      if (min_se > C.DEFAULT_MIN_SE) {
+        extraHeaders.push('Min-SE: ' + min_se);
+      }
+
+      if (interval !== null) {
+        var expires = min_se > interval ? min_se : interval;
+        var refresher = this.session_timer.localRefresher ? 'uac' : 'uas';
+        extraHeaders.push('Session-Expires: ' + expires + ';refresher=' + refresher);
+      }
+    }
+
     request = new JsSIP.OutgoingRequest(
       method,
       this.remote_target,
@@ -2565,7 +2619,8 @@ Dialog.prototype = {
         'from_tag': this.id.local_tag,
         'to_uri': this.remote_uri,
         'to_tag': this.id.remote_tag,
-        'route_set': this.route_set
+        'route_set': this.route_set,
+        'extra_extensions': JsSIP.Utils.getSessionExtensions(this.session, method)
       }, extraHeaders);
 
     request.dialog = this;
@@ -2656,6 +2711,113 @@ Dialog.prototype = {
           this.remote_target = request.parseHeader('contact').uri;
         }
         break;
+    }
+  },
+
+  updateMinSessionExpires: function (interval) {
+    if (interval > this.session_timer.min_interval) {
+      this.session_timer.min_interval = interval;
+    }
+  },
+
+  /**
+   * Configures the appropriate session timer timeout and behaviour, based
+   * on the provided session expires interval and whether the local endpoint
+   * is responsible for refreshes.
+   * @param {Number} interval The session expires interval (in seconds).
+   * @param {Boolean} localRefresher
+   */
+  setSessionRefreshTimer: function () {
+    var localRefresher = this.session_timer.localRefresher;
+    var interval = this.session_timer.interval;
+    var timeout;
+    var action;
+    var self = this;
+
+    if (localRefresher) {
+      timeout = interval / 2;
+      action = function () {
+        self.session_timer.timer_id = null;
+        self.session.emit('refresh', self.session, {});
+      };
+    } else {
+      timeout = interval - Math.max(interval / 3, 32);
+      action = function () {
+        self.session_timer.timer_id = null;
+        self.session.sendBye({
+          status_code: 408,
+          reason_phrase: JsSIP.C.causes.SESSION_TIMER
+        });
+        self.session.ended('system', null, JsSIP.C.causes.SESSION_TIMER);
+      };
+    }
+
+    this.session_timer.timer_id = window.setTimeout(action, timeout * 1000);
+  },
+
+  clearSessionRefreshTimer: function () {
+    if (this.session_timer.timer_id !== null) {
+      window.clearTimeout(this.session_timer.timer_id);
+      this.session_timer.timer_id = null;
+    }
+  },
+
+  disableSessionRefresh: function () {
+    this.session_timer.interval = null;
+    this.clearSessionRefreshTimer();
+  },
+
+  /**
+   * Should only be called when we receive, or are about to send, a 2xx response
+   * to a method that acts as a session refresher (currently INVITE and UPDATE).
+   * @param message The received message (may be request or response)
+   */
+  processSessionTimerHeaders: function (message) {
+    if (message.hasHeader('min-se')) {
+      this.updateMinSessionExpires(message.parseHeader('min-se'));
+    }
+
+    if (!message.hasHeader('session-expires')) {
+      this.disableSessionRefresh();
+      return;
+    }
+
+    this.clearSessionRefreshTimer();
+
+    var se = message.parseHeader('session-expires');
+    var localRefresher = true;
+
+    if (message instanceof JsSIP.IncomingRequest) {
+      // Session timer requested
+      // Refresher parameter is optional at this stage
+      if (se.params && se.params.refresher) {
+        localRefresher = se.params.refresher === 'uas';
+      }
+    } else if (message instanceof JsSIP.IncomingResponse) {
+      // Session timer enabled
+      // Refresher parameter is required at this stage
+      localRefresher = se.params.refresher === 'uac';
+    } else {
+      throw new TypeError('Unexpected message type');
+    }
+
+    this.session_timer.interval = se.interval;
+    this.session_timer.localRefresher = localRefresher;
+
+    this.setSessionRefreshTimer();
+  },
+
+  /**
+   * Adds the Session-Expires header to the provided extra headers array.
+   * Should only be used for a 2xx response to a method that acts as a session
+   * refresher (currently INVITE and UPDATE).
+   * @param extraHeaders
+   */
+  addSessionTimerResponseHeaders: function (extraHeaders) {
+    var interval = this.session_timer.interval;
+    if (interval) {
+      var refresher = this.session_timer.localRefresher ? 'uas' : 'uac';
+      extraHeaders.push('Session-Expires: ' + interval + ';refresher=' + refresher);
     }
   }
 };
@@ -2845,6 +3007,13 @@ InDialogRequestSender.prototype = {
   receiveResponse: function(response) {
     // RFC3261 14.1. Terminate the dialog if a 408 or 481 is received from a re-Invite.
     if (response.status_code === 408 || response.status_code === 481) {
+      if (this.request.method !== JsSIP.BYE) {
+        // Send a BYE as per section 12.2.1.2.
+        this.applicant.session.sendBye({
+          status_code: response.status_code,
+          reason_phrase: response.reason_phrase
+        });
+      }
       this.applicant.session.ended('remote', response, JsSIP.C.causes.DIALOG_ERROR);
     }
     this.applicant.receiveResponse(response);
@@ -3770,6 +3939,9 @@ var Reinvite        = /**
       if (this.session.status === JsSIP.RTCSession.C.STATUS_CONFIRMED) {
         this.session.sendACK();
         console.log(LOG_PREFIX +'re-INVITE ACK sent', Date.now());
+
+        this.session.dialog.processSessionTimerHeaders(response);
+
         this.emit('succeeded', this, {
           originator: 'remote',
           response: response,
@@ -3998,6 +4170,7 @@ var Reinvite        = /**
     options = options || {};
   
     var self = this,
+      request = this.request,
       extraHeaders = options.extraHeaders || [],
       sdp = options.sdp;
   
@@ -4014,6 +4187,9 @@ var Reinvite        = /**
       delete this.timers.answer;
     }
   
+    this.session.dialog.processSessionTimerHeaders(request);
+    this.session.dialog.addSessionTimerResponseHeaders(extraHeaders);
+
     extraHeaders.push('Contact: ' + self.session.contact);
     extraHeaders.push('Allow: '+ JsSIP.Utils.getAllowedMethods(self.session.ua, true));
     extraHeaders.push('Content-Type: application/sdp');
@@ -4023,9 +4199,9 @@ var Reinvite        = /**
       self.onTransportError();
     };
 
-    this.request.reply(200, null, extraHeaders,
+    request.reply(200, null, extraHeaders,
       sdp,
-      this.successResponseSent.bind(this, this.request, extraHeaders, sdp),
+      this.successResponseSent.bind(this, request, extraHeaders, sdp),
       replyFailed
     );
     this.status = JsSIP.RTCSession.C.STATUS_WAITING_FOR_ACK;
@@ -4071,6 +4247,217 @@ var Reinvite        = /**
   return Reinvite;
 }(JsSIP));
 
+var Update          = /**
+ * @fileoverview Update
+ */
+
+/**
+ * @param {JsSIP} JsSIP - The JsSIP namespace
+ * @returns {function} The Update constructor
+ */
+(function(JsSIP) {
+  
+  var Update;
+  
+  /**
+   * @class Update
+   * @param {JsSIP.RTCSession} session
+   */
+  Update = function(session) {
+    var events = [
+    'succeeded',
+    'failed'
+    ];
+  
+    this.session = session;
+    this.direction = null;
+    this.accepted = null;
+  
+    this.initEvents(events);
+  };
+  Update.prototype = new JsSIP.EventEmitter();
+  
+  
+  Update.prototype.send = function(options) {
+    var request_sender, event, eventHandlers, extraHeaders, sdp;
+  
+    this.direction = 'outgoing';
+  
+    // Check RTCSession Status
+    if (this.session.status !== JsSIP.RTCSession.C.STATUS_CONFIRMED &&
+        this.session.status !== JsSIP.RTCSession.C.STATUS_WAITING_FOR_ACK) {
+      throw new JsSIP.Exceptions.InvalidStateError(this.session.status);
+    }
+  
+    // Get Update options
+    options = options || {};
+    extraHeaders = options.extraHeaders ? options.extraHeaders.slice() : [];
+    eventHandlers = options.eventHandlers || {};
+    sdp = options.sdp;
+  
+    // Set event handlers
+    for (event in eventHandlers) {
+      this.on(event, eventHandlers[event]);
+    }
+  
+    extraHeaders.push('Contact: '+ this.session.contact);
+    extraHeaders.push('Allow: '+ JsSIP.Utils.getAllowedMethods(this.session.ua, true));
+    if (sdp) {
+      extraHeaders.push('Content-Type: application/sdp');
+    }
+  
+    this.request = this.session.dialog.createRequest(JsSIP.C.UPDATE, extraHeaders);
+  
+    this.request.body = sdp;
+  
+    request_sender = new RequestSender(this);
+  
+    this.session.emit('update', this.session, {
+      originator: 'local',
+      update: this,
+      request: this.request
+    });
+  
+    request_sender.send();
+  };
+  
+  /**
+   * @private
+   */
+  Update.prototype.receiveResponse = function(response) {
+    var cause;
+  
+    // Double-check that the session has not been terminated
+    if (this.session.status !== JsSIP.RTCSession.C.STATUS_CONFIRMED) {
+      return;
+    }
+
+    switch(true) {
+      case /^1[0-9]{2}$/.test(response.status_code):
+        // Ignore provisional responses.
+        break;
+  
+      case /^2[0-9]{2}$/.test(response.status_code):
+        this.session.dialog.processSessionTimerHeaders(response);
+        this.emit('succeeded', this, {
+          originator: 'remote',
+          response: response
+        });
+        break;
+  
+      default:
+        cause = JsSIP.Utils.sipErrorCause(response.status_code);
+        this.emit('failed', this, {
+          originator: 'remote',
+          response: response,
+          cause: cause
+        });
+        break;
+    }
+  };
+  
+  /**
+   * @private
+   */
+  Update.prototype.onRequestTimeout = function() {
+    this.emit('failed', this, {
+      originator: 'system',
+      cause: JsSIP.C.causes.REQUEST_TIMEOUT
+    });
+  };
+  
+  /**
+   * @private
+   */
+  Update.prototype.onTransportError = function() {
+    this.emit('failed', this, {
+      originator: 'system',
+      cause: JsSIP.C.causes.CONNECTION_ERROR
+    });
+  };
+  
+  /**
+   * @private
+   * @returns {Boolean} true if a 2xx response was sent, false otherwise
+   */
+  Update.prototype.init_incoming = function(request) {
+    this.direction = 'incoming';
+    this.request = request;
+  
+    this.session.emit('update', this.session, {
+      originator: 'remote',
+      update: this,
+      request: request
+    });
+
+    if (this.accepted === null) {
+      // No response sent yet
+      // Just accept empty UPDATEs (for session timer refreshes)
+      var contentType = request.getHeader('content-type');
+      if(contentType || request.body) {
+        this.reject({status_code: 488});
+      } else {
+        this.accept();
+      }
+    }
+
+    return this.accepted;
+  };
+  
+  /**
+   * Accept the incoming Update
+   * Only valid for incoming Updates
+   */
+  Update.prototype.accept = function(options) {
+    options = options || {};
+
+    var
+      extraHeaders = options.extraHeaders || [],
+      body = options.body;
+
+    if (this.direction !== 'incoming') {
+      throw new TypeError('Invalid method "accept" for an outgoing update');
+    }
+
+    this.session.dialog.processSessionTimerHeaders(this.request);
+    this.session.dialog.addSessionTimerResponseHeaders(extraHeaders);
+
+    this.request.reply(200, null, extraHeaders, body);
+    this.accepted = true;
+  };
+
+  /**
+   * Reject the incoming Update
+   * Only valid for incoming Updates
+   *
+   * @param {Number} status_code
+   * @param {String} [reason_phrase]
+   */
+  Update.prototype.reject = function(options) {
+    options = options || {};
+
+    var
+      status_code = options.status_code || 480,
+      reason_phrase = options.reason_phrase,
+      extraHeaders = options.extraHeaders || [],
+      body = options.body;
+
+    if (this.direction !== 'incoming') {
+      throw new TypeError('Invalid method "reject" for an outgoing update');
+    }
+
+    if (status_code < 300 || status_code >= 700) {
+      throw new TypeError('Invalid status_code: '+ status_code);
+    }
+
+    this.request.reply(status_code, reason_phrase, extraHeaders, body);
+    this.accepted = false;
+  };
+
+  return Update;
+}(JsSIP));
+
+
 
 var RTCSession,
   LOG_PREFIX = JsSIP.name +' | '+ 'RTC SESSION' +' | ',
@@ -4095,7 +4482,9 @@ RTCSession = function(ua) {
   'started',
   'ended',
   'newDTMF',
-  'reinvite'
+  'reinvite',
+  'refresh',
+  'update'
   ];
 
   this.ua = ua;
@@ -4119,6 +4508,7 @@ RTCSession = function(ua) {
   this.remote_identity = null;
   this.start_time = null;
   this.end_time = null;
+  this.allowed = null;
 
   // Custom session empty object for high level use
   this.data = {};
@@ -4352,6 +4742,9 @@ RTCSession.prototype.answer = function(options) {
 
   window.clearTimeout(this.timers.userNoAnswerTimer);
 
+  this.dialog.processSessionTimerHeaders(request);
+  this.dialog.addSessionTimerResponseHeaders(extraHeaders);
+
   if (sdp) {
     // Use the application-provided SDP
     answerCreationSucceeded(sdp);
@@ -4473,6 +4866,45 @@ RTCSession.prototype.sendReinvite = function(options) {
 
 
 /**
+ * Send an UPDATE
+ *
+ * @param {Object} [options]
+ */
+RTCSession.prototype.sendUpdate = function(options) {
+  var sdp;
+
+  options = options || {};
+  sdp = options.sdp;
+
+  if (sdp) {
+    // TODO: check whether there is an outstanding offer/answer exchange
+  }
+
+  var update = new Update(this);
+  update.send(options);
+};
+
+/**
+ * Checks whether the provided method is present in the Allow header received
+ * from the remote party.  If an Allow header has not been received, the
+ * provided default is returned instead.
+ * @param {String} method The SIP method to check.
+ * @param {Boolean} defaultValue The value to return if no Allow header has
+ * been received.
+ * @returns {Boolean}
+ */
+RTCSession.prototype.isMethodAllowed = function(method, defaultValue) {
+  if (!this.allowed) {
+    return defaultValue;
+  }
+  if (this.allowed.indexOf(method) >= 0) {
+    return true;
+  }
+  return false;
+};
+
+
+/**
  * RTCPeerconnection handlers
  */
 RTCSession.prototype.getLocalStreams = function() {
@@ -4515,6 +4947,11 @@ RTCSession.prototype.init_incoming = function(request) {
 
   //Save the session into the ua sessions collection.
   this.ua.sessions[this.id] = this;
+
+  // Store the allowed methods if provided
+  if(request.hasHeader('allow')) {
+    this.allowed = request.parseHeader('allow').methods;
+  }
 
   //Get the Expires header value if exists
   if(request.hasHeader('expires')) {
@@ -4606,7 +5043,7 @@ RTCSession.prototype.init_incoming = function(request) {
 RTCSession.prototype.connect = function(target, options) {
   options = options || {};
 
-  var event, requestParams,
+  var event, requestParams, request,
     invalidTarget = false,
     eventHandlers = options.eventHandlers || {},
     extraHeaders = options.extraHeaders || [],
@@ -4650,7 +5087,10 @@ RTCSession.prototype.connect = function(target, options) {
   this.isCanceled = false;
   this.received_100 = false;
 
-  requestParams = {from_tag: this.from_tag};
+  requestParams = {
+      from_tag: this.from_tag,
+      extra_extensions: JsSIP.Utils.getSessionExtensions(this)
+  };
 
   this.contact = this.ua.contact.toString({
     anonymous: this.anonymous,
@@ -4665,11 +5105,11 @@ RTCSession.prototype.connect = function(target, options) {
     extraHeaders.push('Privacy: id');
   }
 
-  extraHeaders.push('Contact: '+ this.contact);
-  extraHeaders.push('Allow: '+ JsSIP.Utils.getAllowedMethods(this.ua, true));
-  extraHeaders.push('Content-Type: application/sdp');
-
-  this.request = new JsSIP.OutgoingRequest(JsSIP.C.INVITE, target, this.ua, requestParams, extraHeaders);
+  request = new JsSIP.OutgoingRequest(JsSIP.C.INVITE, target, this.ua, requestParams, extraHeaders);
+  this.request = request;
+  request.setHeader('contact', this.contact);
+  request.setHeader('allow', JsSIP.Utils.getAllowedMethods(this.ua, true));
+  request.setHeader('content-type', 'application/sdp');
 
   this.id = this.request.call_id + this.from_tag;
 
@@ -4886,14 +5326,8 @@ RTCSession.prototype.receiveRequest = function(request) {
       }
       break;
     case JsSIP.C.UPDATE:
-      // For now, just support empty UPDATEs (for session timer refreshes)
-      contentType = request.getHeader('content-type');
-      if(contentType || request.body) {
-        request.reply(488);
-        return false;
-      }
-      request.reply(200);
-      break;
+      var update = new Update(this);
+      return update.init_incoming(request);
   }
 
   return true;
@@ -5065,6 +5499,13 @@ RTCSession.prototype.receiveInviteResponse = function(response) {
       }
 
       this.sendACK();
+
+      // Store the allowed methods if provided
+      if(response.hasHeader('allow')) {
+        this.allowed = response.parseHeader('allow').methods;
+      }
+
+      this.dialog.processSessionTimerHeaders(response);
 
       if (this.rtcMediaHandler) {
         // We're handling the SDP, media, peer connection, etc
@@ -5611,6 +6052,21 @@ var UA,
     ],
 
     SUPPORTED: 'path, outbound, gruu',
+
+    /* Session events and corresponding SIP extensions.
+     * Dynamically added to 'Supported' header field if the
+     * corresponding event handler is set.
+     */
+    SESSION_EVENT_EXTENSIONS: {
+      'refresh': 'timer'
+    },
+
+    /*
+     * Limits the methods on which a given extension is listed as supported.
+     */
+    EXTENSION_METHODS: {
+      'timer': ['INVITE', 'UPDATE']
+    },
 
     MAX_FORWARDS: 69,
     TAG_LENGTH: 10
@@ -6894,7 +7350,8 @@ Utils= {
     var exceptions = {
       'Call-Id': 'Call-ID',
       'Cseq': 'CSeq',
-      'Www-Authenticate': 'WWW-Authenticate'
+      'Www-Authenticate': 'WWW-Authenticate',
+      'Min-Se': 'Min-SE'
       },
       name = string.toLowerCase().replace(/_/g,'-').split('-'),
       hname = '', part;
@@ -6949,6 +7406,23 @@ Utils= {
     }
 
     return allowed;
+  },
+
+  getSessionExtensions: function(session, method) {
+    var event, option,
+      supported = '';
+
+    for (event in JsSIP.UA.C.SESSION_EVENT_EXTENSIONS) {
+      if (session.checkEvent(event) && session.listeners(event).length > 0) {
+        // Check whether this extension should be added to this method
+        option = JsSIP.UA.C.SESSION_EVENT_EXTENSIONS[event];
+        if (JsSIP.UA.C.EXTENSION_METHODS[option].indexOf(method) >= 0) {
+          supported += ', ' + option;
+        }
+      }
+    }
+
+    return supported;
   },
 
   // MD5 (Message-Digest Algorithm) http://www.webtoolkit.info
@@ -7788,6 +8262,8 @@ JsSIP.Grammar = (function(){
         "Status_Code": parse_Status_Code,
         "extension_code": parse_extension_code,
         "Reason_Phrase": parse_Reason_Phrase,
+        "Allow": parse_Allow,
+        "allow_method": parse_allow_method,
         "Allow_Events": parse_Allow_Events,
         "Call_ID": parse_Call_ID,
         "Contact": parse_Contact,
@@ -7827,6 +8303,7 @@ JsSIP.Grammar = (function(){
         "tag_param": parse_tag_param,
         "Max_Forwards": parse_Max_Forwards,
         "Min_Expires": parse_Min_Expires,
+        "Min_Se": parse_Min_Se,
         "Name_Addr_Header": parse_Name_Addr_Header,
         "Proxy_Authenticate": parse_Proxy_Authenticate,
         "challenge": parse_challenge,
@@ -7845,11 +8322,15 @@ JsSIP.Grammar = (function(){
         "qop_options": parse_qop_options,
         "qop_value": parse_qop_value,
         "Proxy_Require": parse_Proxy_Require,
+        "option_tag": parse_option_tag,
         "Record_Route": parse_Record_Route,
         "rec_route": parse_rec_route,
         "Require": parse_Require,
         "Route": parse_Route,
         "route_param": parse_route_param,
+        "Session_Expires": parse_Session_Expires,
+        "se_param": parse_se_param,
+        "refresher_param": parse_refresher_param,
         "Subscription_State": parse_Subscription_State,
         "substate_value": parse_substate_value,
         "subexp_params": parse_subexp_params,
@@ -15459,6 +15940,75 @@ JsSIP.Grammar = (function(){
         return result0;
       }
       
+      function parse_Allow() {
+        var result0, result1, result2, result3;
+        var pos0, pos1;
+        
+        pos0 = pos;
+        result0 = parse_allow_method();
+        if (result0 !== null) {
+          result1 = [];
+          pos1 = pos;
+          result2 = parse_COMMA();
+          if (result2 !== null) {
+            result3 = parse_allow_method();
+            if (result3 !== null) {
+              result2 = [result2, result3];
+            } else {
+              result2 = null;
+              pos = pos1;
+            }
+          } else {
+            result2 = null;
+            pos = pos1;
+          }
+          while (result2 !== null) {
+            result1.push(result2);
+            pos1 = pos;
+            result2 = parse_COMMA();
+            if (result2 !== null) {
+              result3 = parse_allow_method();
+              if (result3 !== null) {
+                result2 = [result2, result3];
+              } else {
+                result2 = null;
+                pos = pos1;
+              }
+            } else {
+              result2 = null;
+              pos = pos1;
+            }
+          }
+          if (result1 !== null) {
+            result0 = [result0, result1];
+          } else {
+            result0 = null;
+            pos = pos0;
+          }
+        } else {
+          result0 = null;
+          pos = pos0;
+        }
+        return result0;
+      }
+      
+      function parse_allow_method() {
+        var result0;
+        var pos0;
+        
+        pos0 = pos;
+        result0 = parse_Method();
+        if (result0 !== null) {
+          result0 = (function(offset, method) {
+                         if (!data.methods) data.methods = [];
+                         data.methods.push(method); })(pos0, result0);
+        }
+        if (result0 === null) {
+          pos = pos0;
+        }
+        return result0;
+      }
+      
       function parse_Allow_Events() {
         var result0, result1, result2, result3;
         var pos0, pos1;
@@ -16946,6 +17496,70 @@ JsSIP.Grammar = (function(){
         return result0;
       }
       
+      function parse_Min_Se() {
+        var result0, result1, result2, result3;
+        var pos0, pos1, pos2;
+        
+        pos0 = pos;
+        pos1 = pos;
+        result0 = parse_delta_seconds();
+        if (result0 !== null) {
+          result1 = [];
+          pos2 = pos;
+          result2 = parse_SEMI();
+          if (result2 !== null) {
+            result3 = parse_generic_param();
+            if (result3 !== null) {
+              result2 = [result2, result3];
+            } else {
+              result2 = null;
+              pos = pos2;
+            }
+          } else {
+            result2 = null;
+            pos = pos2;
+          }
+          while (result2 !== null) {
+            result1.push(result2);
+            pos2 = pos;
+            result2 = parse_SEMI();
+            if (result2 !== null) {
+              result3 = parse_generic_param();
+              if (result3 !== null) {
+                result2 = [result2, result3];
+              } else {
+                result2 = null;
+                pos = pos2;
+              }
+            } else {
+              result2 = null;
+              pos = pos2;
+            }
+          }
+          if (result1 !== null) {
+            result0 = [result0, result1];
+          } else {
+            result0 = null;
+            pos = pos1;
+          }
+        } else {
+          result0 = null;
+          pos = pos1;
+        }
+        if (result0 !== null) {
+          result0 = (function(offset, min_se) {
+                              if (min_se >= 90) {
+                              	data = min_se;
+                              } else {
+                              	data = -1;
+                              }})(pos0, result0[0]);
+        }
+        if (result0 === null) {
+          pos = pos0;
+        }
+        return result0;
+      }
+      
       function parse_Name_Addr_Header() {
         var result0, result1, result2, result3, result4, result5, result6;
         var pos0, pos1, pos2;
@@ -17775,13 +18389,13 @@ JsSIP.Grammar = (function(){
         var pos0, pos1;
         
         pos0 = pos;
-        result0 = parse_token();
+        result0 = parse_option_tag();
         if (result0 !== null) {
           result1 = [];
           pos1 = pos;
           result2 = parse_COMMA();
           if (result2 !== null) {
-            result3 = parse_token();
+            result3 = parse_option_tag();
             if (result3 !== null) {
               result2 = [result2, result3];
             } else {
@@ -17797,7 +18411,7 @@ JsSIP.Grammar = (function(){
             pos1 = pos;
             result2 = parse_COMMA();
             if (result2 !== null) {
-              result3 = parse_token();
+              result3 = parse_option_tag();
               if (result3 !== null) {
                 result2 = [result2, result3];
               } else {
@@ -17817,6 +18431,23 @@ JsSIP.Grammar = (function(){
           }
         } else {
           result0 = null;
+          pos = pos0;
+        }
+        return result0;
+      }
+      
+      function parse_option_tag() {
+        var result0;
+        var pos0;
+        
+        pos0 = pos;
+        result0 = parse_token();
+        if (result0 !== null) {
+          result0 = (function(offset, option) {
+                           if (!data.options) data.options = [];
+                           data.options.push(option); })(pos0, result0);
+        }
+        if (result0 === null) {
           pos = pos0;
         }
         return result0;
@@ -17968,51 +18599,59 @@ JsSIP.Grammar = (function(){
       
       function parse_Require() {
         var result0, result1, result2, result3;
-        var pos0, pos1;
+        var pos0, pos1, pos2;
         
         pos0 = pos;
-        result0 = parse_token();
+        pos1 = pos;
+        result0 = parse_option_tag();
         if (result0 !== null) {
           result1 = [];
-          pos1 = pos;
+          pos2 = pos;
           result2 = parse_COMMA();
           if (result2 !== null) {
-            result3 = parse_token();
+            result3 = parse_option_tag();
             if (result3 !== null) {
               result2 = [result2, result3];
             } else {
               result2 = null;
-              pos = pos1;
+              pos = pos2;
             }
           } else {
             result2 = null;
-            pos = pos1;
+            pos = pos2;
           }
           while (result2 !== null) {
             result1.push(result2);
-            pos1 = pos;
+            pos2 = pos;
             result2 = parse_COMMA();
             if (result2 !== null) {
-              result3 = parse_token();
+              result3 = parse_option_tag();
               if (result3 !== null) {
                 result2 = [result2, result3];
               } else {
                 result2 = null;
-                pos = pos1;
+                pos = pos2;
               }
             } else {
               result2 = null;
-              pos = pos1;
+              pos = pos2;
             }
           }
           if (result1 !== null) {
             result0 = [result0, result1];
           } else {
             result0 = null;
-            pos = pos0;
+            pos = pos1;
           }
         } else {
           result0 = null;
+          pos = pos1;
+        }
+        if (result0 !== null) {
+          result0 = (function(offset) {
+                          data = data.options; })(pos0);
+        }
+        if (result0 === null) {
           pos = pos0;
         }
         return result0;
@@ -18117,6 +18756,139 @@ JsSIP.Grammar = (function(){
           }
         } else {
           result0 = null;
+          pos = pos0;
+        }
+        return result0;
+      }
+      
+      function parse_Session_Expires() {
+        var result0, result1, result2, result3;
+        var pos0, pos1, pos2;
+        
+        pos0 = pos;
+        pos1 = pos;
+        result0 = parse_delta_seconds();
+        if (result0 !== null) {
+          result1 = [];
+          pos2 = pos;
+          result2 = parse_SEMI();
+          if (result2 !== null) {
+            result3 = parse_se_param();
+            if (result3 !== null) {
+              result2 = [result2, result3];
+            } else {
+              result2 = null;
+              pos = pos2;
+            }
+          } else {
+            result2 = null;
+            pos = pos2;
+          }
+          while (result2 !== null) {
+            result1.push(result2);
+            pos2 = pos;
+            result2 = parse_SEMI();
+            if (result2 !== null) {
+              result3 = parse_se_param();
+              if (result3 !== null) {
+                result2 = [result2, result3];
+              } else {
+                result2 = null;
+                pos = pos2;
+              }
+            } else {
+              result2 = null;
+              pos = pos2;
+            }
+          }
+          if (result1 !== null) {
+            result0 = [result0, result1];
+          } else {
+            result0 = null;
+            pos = pos1;
+          }
+        } else {
+          result0 = null;
+          pos = pos1;
+        }
+        if (result0 !== null) {
+          result0 = (function(offset, interval) {
+                              data.interval = interval; })(pos0, result0[0]);
+        }
+        if (result0 === null) {
+          pos = pos0;
+        }
+        return result0;
+      }
+      
+      function parse_se_param() {
+        var result0;
+        
+        result0 = parse_refresher_param();
+        if (result0 === null) {
+          result0 = parse_generic_param();
+        }
+        return result0;
+      }
+      
+      function parse_refresher_param() {
+        var result0, result1, result2;
+        var pos0, pos1;
+        
+        pos0 = pos;
+        pos1 = pos;
+        if (input.substr(pos, 9).toLowerCase() === "refresher") {
+          result0 = input.substr(pos, 9);
+          pos += 9;
+        } else {
+          result0 = null;
+          if (reportFailures === 0) {
+            matchFailed("\"refresher\"");
+          }
+        }
+        if (result0 !== null) {
+          result1 = parse_EQUAL();
+          if (result1 !== null) {
+            if (input.substr(pos, 3).toLowerCase() === "uas") {
+              result2 = input.substr(pos, 3);
+              pos += 3;
+            } else {
+              result2 = null;
+              if (reportFailures === 0) {
+                matchFailed("\"uas\"");
+              }
+            }
+            if (result2 === null) {
+              if (input.substr(pos, 3).toLowerCase() === "uac") {
+                result2 = input.substr(pos, 3);
+                pos += 3;
+              } else {
+                result2 = null;
+                if (reportFailures === 0) {
+                  matchFailed("\"uac\"");
+                }
+              }
+            }
+            if (result2 !== null) {
+              result0 = [result0, result1, result2];
+            } else {
+              result0 = null;
+              pos = pos1;
+            }
+          } else {
+            result0 = null;
+            pos = pos1;
+          }
+        } else {
+          result0 = null;
+          pos = pos1;
+        }
+        if (result0 !== null) {
+          result0 = (function(offset, refresher) {
+                              if(!data.params) data.params = {};
+                              data.params['refresher'] = refresher; })(pos0, result0[2]);
+        }
+        if (result0 === null) {
           pos = pos0;
         }
         return result0;
@@ -18439,54 +19211,62 @@ JsSIP.Grammar = (function(){
       
       function parse_Supported() {
         var result0, result1, result2, result3;
-        var pos0, pos1;
+        var pos0, pos1, pos2;
         
         pos0 = pos;
-        result0 = parse_token();
+        pos1 = pos;
+        result0 = parse_option_tag();
         if (result0 !== null) {
           result1 = [];
-          pos1 = pos;
+          pos2 = pos;
           result2 = parse_COMMA();
           if (result2 !== null) {
-            result3 = parse_token();
+            result3 = parse_option_tag();
             if (result3 !== null) {
               result2 = [result2, result3];
             } else {
               result2 = null;
-              pos = pos1;
+              pos = pos2;
             }
           } else {
             result2 = null;
-            pos = pos1;
+            pos = pos2;
           }
           while (result2 !== null) {
             result1.push(result2);
-            pos1 = pos;
+            pos2 = pos;
             result2 = parse_COMMA();
             if (result2 !== null) {
-              result3 = parse_token();
+              result3 = parse_option_tag();
               if (result3 !== null) {
                 result2 = [result2, result3];
               } else {
                 result2 = null;
-                pos = pos1;
+                pos = pos2;
               }
             } else {
               result2 = null;
-              pos = pos1;
+              pos = pos2;
             }
           }
           if (result1 !== null) {
             result0 = [result0, result1];
           } else {
             result0 = null;
-            pos = pos0;
+            pos = pos1;
           }
         } else {
           result0 = null;
-          pos = pos0;
+          pos = pos1;
         }
         result0 = result0 !== null ? result0 : "";
+        if (result0 !== null) {
+          result0 = (function(offset) {
+                       data = data.options || []; })(pos0);
+        }
+        if (result0 === null) {
+          pos = pos0;
+        }
         return result0;
       }
       
