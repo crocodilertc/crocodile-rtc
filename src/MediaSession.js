@@ -224,6 +224,7 @@
 		this.remoteHoldStreams = null;
 		this.localHold = false;
 		this.localHoldStreams = null;
+		this.dtmfSender = null;
 
 		// Public properties
 		/**
@@ -1053,15 +1054,125 @@
 	};
 
 	/**
+	 * Mutes the local microphone.
 	 * <p>
-	 * Explicitly close this {@link CrocSDK.MediaAPI~MediaSession MediaSession}. If <code>accept()</code> has not
-	 * been called the session will be rejected.
-	 * </p>
+	 * Mute may be preferable to hold if you still want to receive the remote
+	 * party's media, or if you want to avoid media renegotiation (which is not
+	 * currently supported in Firefox).
+	 * <p>
+	 * Due to the logical and functional overlap, not to mention potential user
+	 * confusion, mixing mute and hold is not recommended.
 	 * 
+	 * @method CrocSDK.MediaAPI~MediaSession#mute
+	 */
+	CrocSDK.MediaSession.prototype.mute = function() {
+		var audioTracks = this.localStream.getAudioTracks();
+		for (var i = 0, len = audioTracks.length; i < len; i++) {
+			audioTracks[i].enabled = false;
+		}
+	};
+
+	/**
+	 * Unmutes the local microphone.
+	 * 
+	 * @method CrocSDK.MediaAPI~MediaSession#unmute
+	 * @throws {CrocSDK.Exceptions#StateError} If the remote party is currently
+	 * on-hold.
+	 */
+	CrocSDK.MediaSession.prototype.unmute = function() {
+		if (this.localHold) {
+			throw new CrocSDK.Exceptions.StateError('Cannot unmute a held call');
+		}
+
+		var audioTracks = this.localStream.getAudioTracks();
+		for (var i = 0, len = audioTracks.length; i < len; i++) {
+			audioTracks[i].enabled = true;
+		}
+	};
+
+	/**
+	 * Sends DTMF tones to the remote party.
+	 * <p>
+	 * If DTMF playout is already in progress, the provided tone(s) will be
+	 * appended to the existing queue.
+	 * 
+	 * @method CrocSDK.MediaAPI~MediaSession#sendDTMF
+	 * @param {String|Number} tones
+	 * One or more DTMF symbols to send.  Valid symbols include the numbers 0 to
+	 * 9, and the characters *, #, and A through D.  A comma is also valid,
+	 * which will insert a two-second gap in the played tones.
+	 * @param {Object} [config]
+	 * Optional extra configuration.
+	 * @param {Number} [config.duration]
+	 * The duration, in milliseconds, to play each DTMF tone. Defaults to 200ms
+	 * if not provided. Valid values range from 70ms to 6000ms.
+	 * @param {Number} [config.interToneGap]
+	 * The amount of time to leave, in milliseconds, between each DTMF tone.
+	 * Defaults to 50ms for the <code>pc</code type (the minimum), or 500ms
+	 * for the <code>info</code> type.
+	 * @throws {CrocSDK.Exceptions#ValueError} If the <code>pc</code> type is
+	 * attempted when it is not sending an audio stream.
+	 */
+	CrocSDK.MediaSession.prototype.sendDTMF = function(tones, config) {
+		config = config || {};
+		var type = config.type || 'pc';
+		var duration = config.duration || 200;
+		var interToneGap = config.interToneGap || type === 'info' ? 500: 50;
+		var self = this;
+
+		tones = tones.toString().toUpperCase();
+		if (/[^0-9A-D\*#,]/.test(tones)) {
+			throw new CrocSDK.Exceptions.ValueError(
+					'Invalid characters in DTMF tones:', tones);
+		}
+
+		duration = Math.max(duration, 70);
+		duration = Math.min(duration, 6000);
+		interToneGap = Math.max(interToneGap, 50);
+
+		switch (type) {
+		default:
+		case 'pc':
+			var sender = this.dtmfSender;
+			if (sender) {
+				// Append to the existing tone buffer, using the existing
+				// duration and gap settings.
+				sender.insertDTMF(sender.toneBuffer + tones, sender.duration,
+						sender.interToneGap);
+				return;
+			}
+
+			var audioTracks = this.localStream.getAudioTracks();
+			if (audioTracks.length < 1) {
+				throw new CrocSDK.Exceptions.ValueError(
+						'Cannot send DTMF without an audio track');
+			}
+			sender = this.peerConnection.createDTMFSender(audioTracks[0]);
+			sender.insertDTMF(tones, duration, interToneGap);
+			sender.ontonechange = function (event) {
+				if (!event.tone) {
+					// Playout has completed - discard the sender
+					self.dtmfSender = null;
+				}
+			};
+			this.dtmfSender = sender;
+			break;	
+		case 'info':
+			this.sipSession.sendDTMF(tones, {
+				duration: duration,
+				interToneGap: interToneGap
+			});
+			break;
+		}
+	};
+
+	/**
+	 * Explicitly close this {@link CrocSDK.MediaAPI~MediaSession MediaSession}.
+	 * If <code>accept()</code> has not been called the session will be
+	 * rejected.
 	 * <p>
 	 * If the <code>status</code> argument is not provided it will default to
 	 * <code>normal</code>.
-	 * </p>
 	 * 
 	 * @memberof CrocSDK.MediaAPI~MediaSession
 	 * @function CrocSDK.MediaAPI~MediaSession#close
