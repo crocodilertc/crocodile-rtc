@@ -1108,10 +1108,9 @@
 	 * if not provided. Valid values range from 70ms to 6000ms.
 	 * @param {Number} [config.interToneGap]
 	 * The amount of time to leave, in milliseconds, between each DTMF tone.
-	 * Defaults to 50ms for the <code>pc</code type (the minimum), or 500ms
-	 * for the <code>info</code> type.
-	 * @throws {CrocSDK.Exceptions#ValueError} If the <code>pc</code> type is
-	 * attempted when it is not sending an audio stream.
+	 * Defaults to 50ms.
+	 * @throws {CrocSDK.Exceptions#ValueError} If sending of DTMF is attempted
+	 * when no audio stream is being sent.
 	 */
 	CrocSDK.MediaSession.prototype.sendDTMF = function(tones, config) {
 		config = config || {};
