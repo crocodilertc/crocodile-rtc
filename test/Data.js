@@ -40,7 +40,7 @@
 	};
 	var strData = "Test Data";
 	
-	QUnit.module("Data API");
+	QUnit.module("DataAPI");
 	
 	QUnit.asyncTest("Test send fail", 1, function(assert) {
 		var croc1 = $.croc(config1);
