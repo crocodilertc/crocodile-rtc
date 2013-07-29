@@ -193,12 +193,11 @@
 	 * {@link CrocSDK.MediaAPI#event:onMediaSession Media.onMediaSession} event
 	 * handler.
 	 * 
-	 * @constructor MediaSession
-	 * @memberof CrocSDK.MediaAPI
-	 * @inner
+	 * @constructor
+	 * @alias CrocSDK.MediaAPI~MediaSession
 	 * @classdesc Represents a media session with a remote party.
 	 */
-	CrocSDK.MediaSession = function (mediaApi, sipSession, address, constraints) {
+	var MediaSession = function(mediaApi, sipSession, address, constraints) {
 		var croc = mediaApi.crocObject;
 		var iceServers = croc.iceServers;
 		if (croc.dynamicIceServers) {
@@ -339,7 +338,7 @@
 	 * @returns <code>true</code> if local user media has been requested
 	 * <code>false</code> if we already have (or don't need) local user media
 	 */
-	CrocSDK.MediaSession.prototype._getUserMedia = function (streamConfig, onSuccess) {
+	MediaSession.prototype._getUserMedia = function(streamConfig, onSuccess) {
 		var mediaSession = this;
 		var sc = streamConfig || this.streamConfig;
 		var constraints = {
@@ -406,7 +405,7 @@
 	 * @param onSuccess
 	 * Callback to execute when the SDP offer is complete.
 	 */
-	CrocSDK.MediaSession.prototype._createOffer = function (streamConfig, onSuccess) {
+	MediaSession.prototype._createOffer = function(streamConfig, onSuccess) {
 		var self = this;
 		var pc = this.peerConnection;
 		var sc = streamConfig || this.streamConfig;
@@ -465,7 +464,7 @@
 	 * @param onSuccess
 	 *            Callback to execute when the SDP answer is complete.
 	 */
-	CrocSDK.MediaSession.prototype._createAnswer = function (onSuccess) {
+	MediaSession.prototype._createAnswer = function(onSuccess) {
 		var mediaSession = this;
 		var pc = this.peerConnection;
 
@@ -511,7 +510,7 @@
 	/**
 	 * @private
 	 */
-	CrocSDK.MediaSession.prototype._updateIceServers = function (iceServers) {
+	MediaSession.prototype._updateIceServers = function(iceServers) {
 		this.peerConnection.updateIce({
 			iceServers: iceServers
 		});
@@ -520,7 +519,7 @@
 	/**
 	 * @private
 	 */
-	CrocSDK.MediaSession.prototype._setRemoteStreamOutput = function () {
+	MediaSession.prototype._setRemoteStreamOutput = function() {
 		var stream;
 		var pc = this.peerConnection;
 
@@ -542,9 +541,9 @@
 	/**
 	 * @private
 	 */
-	CrocSDK.MediaSession.prototype._connect = function () {
+	MediaSession.prototype._connect = function() {
 		var self = this;
-		this._getUserMedia(null, function () {
+		this._getUserMedia(null, function() {
 			self._sendInvite();
 		});
 	};
@@ -552,7 +551,7 @@
 	/**
 	 * @private
 	 */
-	CrocSDK.MediaSession.prototype._sendInvite = function () {
+	MediaSession.prototype._sendInvite = function() {
 		var self = this;
 		var crocObject = this.mediaApi.crocObject;
 		var capabilityApi = crocObject.capability;
@@ -578,7 +577,7 @@
 	/**
 	 * @private
 	 */
-	CrocSDK.MediaSession.prototype._sendReinvite = function (streamConfig, customHeaders) {
+	MediaSession.prototype._sendReinvite = function(streamConfig, customHeaders) {
 		var self = this;
 
 		customHeaders = customHeaders || this.customHeaders;
@@ -596,7 +595,7 @@
 	/**
 	 * @private
 	 */
-	CrocSDK.MediaSession.prototype._handleNegotiationNeeded = function () {
+	MediaSession.prototype._handleNegotiationNeeded = function() {
 		if (this.state !== mediaSessionState.ESTABLISHED) {
 			console.log('Ignoring negotiationneeded event - session not established');
 			return;
@@ -614,7 +613,7 @@
 	/**
 	 * @private
 	 */
-	CrocSDK.MediaSession.prototype._handleInitialInvite = function (rawSdp,
+	MediaSession.prototype._handleInitialInvite = function(rawSdp,
 			parsedSdp, onSuccess, onFailure) {
 		var sessionDesc = new JsSIP.WebRTC.RTCSessionDescription({
 			type : 'offer',
@@ -630,7 +629,7 @@
 	 * Handles "started" events from JsSIP.
 	 * @private
 	 */
-	CrocSDK.MediaSession.prototype._handleStarted = function (event) {
+	MediaSession.prototype._handleStarted = function(event) {
 		var response = event.data.response;
 
 		this.state = mediaSessionState.ESTABLISHED;
@@ -672,7 +671,7 @@
 	 * Handles "reinvite" events from JsSIP.
 	 * @private
 	 */
-	CrocSDK.MediaSession.prototype._handleReinvite = function (event) {
+	MediaSession.prototype._handleReinvite = function(event) {
 		var self = this;
 		var data = event.data;
 		var i, len;
@@ -729,12 +728,12 @@
 				type: 'offer',
 				sdp: rawSdp
 			});
-			var onSuccess = function () {
+			var onSuccess = function() {
 				var oldStreamConfig = self.streamConfig;
 				console.log('Remote offer set');
 				data.reinvite.sdpValid();
 
-				var accept = function (acceptStreamConfig) {
+				var accept = function(acceptStreamConfig) {
 					if (acceptStreamConfig) {
 						self.streamConfig = new CrocSDK.StreamConfig(acceptStreamConfig);
 					} else {
@@ -743,8 +742,8 @@
 					}
 					self.customHeaders = customHeaders;
 
-					var answer = function () {
-						self._createAnswer(function () {
+					var answer = function() {
+						self._createAnswer(function() {
 							data.reinvite.accept({
 								sdp: self.peerConnection.localDescription.sdp
 							});
@@ -775,7 +774,7 @@
 					CrocSDK.Util.fireEvent(self, 'onResume', {});
 				} else {
 					// Generic renegotiation
-					var reject = function () {
+					var reject = function() {
 						data.reinvite.reject({status_code: 488});
 					};
 					var safe = true;
@@ -803,7 +802,7 @@
 			this.peerConnection.setRemoteDescription(sessionDesc, onSuccess, onFailure);
 		} else {
 			// Outgoing re-INVITE
-			data.reinvite.on('succeeded', function (event) {
+			data.reinvite.on('succeeded', function(event) {
 				var onSuccess = function() {
 					console.log('Remote answer set');
 					self._setRemoteStreamOutput();
@@ -837,7 +836,7 @@
 				});
 			});
 
-			data.reinvite.on('failed', function (event) {
+			data.reinvite.on('failed', function(event) {
 				// Not sure how to get the RTCPeerConnection back into a stable
 				// state; the simplest option here is to end the session.
 				console.log('Reinvite failed, closing session', event.data);
@@ -848,7 +847,7 @@
 			});
 		}
 
-		data.reinvite.on('completed', function () {
+		data.reinvite.on('completed', function() {
 			self.offerOutstanding = false;
 			if (self.oldLocalStream) {
 				self.oldLocalStream.stop();
@@ -862,7 +861,7 @@
 	 * Handles "refresh" events from JsSIP.
 	 * @private
 	 */
-	CrocSDK.MediaSession.prototype._handleRefresh = function () {
+	MediaSession.prototype._handleRefresh = function() {
 		if (this.sipSession.isMethodAllowed(JsSIP.C.UPDATE, false)) {
 			this.sipSession.sendUpdate();
 		} else {
@@ -879,16 +878,16 @@
 	 * may be used to selectively accept or modify the offered streams; if 
 	 * this is not provided the offered stream configuration is accepted.
 	 * 
-	 * @memberof CrocSDK.MediaAPI~MediaSession
-	 * @function CrocSDK.MediaAPI~MediaSession#accept
 	 * @param {CrocSDK.MediaAPI~StreamConfig} [config]
 	 * May be used to selectively accept or modify the offered streams.
+	 * 
 	 * @fires CrocSDK.MediaAPI~MediaSession#onConnect
+	 * 
 	 * @throws {TypeError}
 	 * @throws {CrocSDK.Exceptions#ValueError}
 	 * @throws {CrocSDK.Exceptions#StateError}
 	 */
-	CrocSDK.MediaSession.prototype.accept = function(config) {
+	MediaSession.prototype.accept = function(config) {
 		var mediaSession = this;
 
 		if (config) {
@@ -928,12 +927,10 @@
 	 * Note: due to current limitations of WebRTC, if the renegotiation fails
 	 * the session will be closed.
 	 * 
-	 * @memberof CrocSDK.MediaAPI~MediaSession
-	 * @function CrocSDK.MediaAPI~MediaSession#hold
 	 * @throws {CrocSDK.Exceptions#StateError} If a renegotiation is already in
 	 * progress.
 	 */
-	CrocSDK.MediaSession.prototype.hold = function() {
+	MediaSession.prototype.hold = function() {
 		if (this.localHold) {
 			// Don't need to do anything
 			return;
@@ -966,12 +963,10 @@
 	 * Note: due to current limitations of WebRTC, if the renegotiation fails
 	 * the session will be closed.
 	 * 
-	 * @memberof CrocSDK.MediaAPI~MediaSession
-	 * @function CrocSDK.MediaAPI~MediaSession#resume
 	 * @throws {CrocSDK.Exceptions#StateError} If a renegotiation is already in
 	 * progress.
 	 */
-	CrocSDK.MediaSession.prototype.resume = function() {
+	MediaSession.prototype.resume = function() {
 		if (!this.localHold) {
 			// Don't need to do anything
 			return;
@@ -1011,17 +1006,16 @@
 	 * to choose whether they enable their own video, which would be done in
 	 * a subsequent renegotiation initiated from their end.
 	 * 
-	 * @memberof CrocSDK.MediaAPI~MediaSession
-	 * @function CrocSDK.MediaAPI~MediaSession#renegotiate
 	 * @param {CrocSDK.MediaAPI~ConnectConfig} [connectConfig]
 	 * Optional new configuration to use in the negotiation.
+	 * 
 	 * @throws {TypeError} If a parameter is set to an unexpected type.
 	 * @throws {CrocSDK.Exceptions#ValueError} If a parameter is set to an
 	 * unexpected value.
 	 * @throws {CrocSDK.Exceptions#StateError} If a renegotiation is already in
 	 * progress, or if streams are being modified whilst the call is on-hold.
 	 */
-	CrocSDK.MediaSession.prototype.renegotiate = function(connectConfig) {
+	MediaSession.prototype.renegotiate = function(connectConfig) {
 		if (!connectConfig) {
 			connectConfig = {};
 		}
@@ -1045,7 +1039,7 @@
 
 		if (streamConfig && !streamConfig.sendingStreamsEqual(this.streamConfig)) {
 			var self = this;
-			this._getUserMedia(streamConfig, function () {
+			this._getUserMedia(streamConfig, function() {
 				self._sendReinvite(streamConfig, customHeaders);
 			});
 		} else {
@@ -1062,10 +1056,8 @@
 	 * <p>
 	 * Due to the logical and functional overlap, not to mention potential user
 	 * confusion, mixing mute and hold is not recommended.
-	 * 
-	 * @method CrocSDK.MediaAPI~MediaSession#mute
 	 */
-	CrocSDK.MediaSession.prototype.mute = function() {
+	MediaSession.prototype.mute = function() {
 		var audioTracks = this.localStream.getAudioTracks();
 		for (var i = 0, len = audioTracks.length; i < len; i++) {
 			audioTracks[i].enabled = false;
@@ -1075,11 +1067,10 @@
 	/**
 	 * Unmutes the local microphone.
 	 * 
-	 * @method CrocSDK.MediaAPI~MediaSession#unmute
 	 * @throws {CrocSDK.Exceptions#StateError} If the remote party is currently
 	 * on-hold.
 	 */
-	CrocSDK.MediaSession.prototype.unmute = function() {
+	MediaSession.prototype.unmute = function() {
 		if (this.localHold) {
 			throw new CrocSDK.Exceptions.StateError('Cannot unmute a held call');
 		}
@@ -1096,7 +1087,6 @@
 	 * If DTMF playout is already in progress, the provided tone(s) will be
 	 * appended to the existing queue.
 	 * 
-	 * @method CrocSDK.MediaAPI~MediaSession#sendDTMF
 	 * @param {String|Number} tones
 	 * One or more DTMF symbols to send.  Valid symbols include the numbers 0 to
 	 * 9, and the characters *, #, and A through D.  A comma is also valid,
@@ -1109,10 +1099,11 @@
 	 * @param {Number} [config.interToneGap]
 	 * The amount of time to leave, in milliseconds, between each DTMF tone.
 	 * Defaults to 50ms.
+	 * 
 	 * @throws {CrocSDK.Exceptions#ValueError} If sending of DTMF is attempted
 	 * when no audio stream is being sent.
 	 */
-	CrocSDK.MediaSession.prototype.sendDTMF = function(tones, config) {
+	MediaSession.prototype.sendDTMF = function(tones, config) {
 		config = config || {};
 		var type = config.type || 'pc';
 		var duration = config.duration || 200;
@@ -1148,7 +1139,7 @@
 			}
 			sender = this.peerConnection.createDTMFSender(audioTracks[0]);
 			sender.insertDTMF(tones, duration, interToneGap);
-			sender.ontonechange = function (event) {
+			sender.ontonechange = function(event) {
 				if (!event.tone) {
 					// Playout has completed - discard the sender
 					self.dtmfSender = null;
@@ -1166,21 +1157,18 @@
 	};
 
 	/**
-	 * Explicitly close this {@link CrocSDK.MediaAPI~MediaSession MediaSession}.
+	 * Explicitly close this media session.
+	 * <p>
 	 * If <code>accept()</code> has not been called the session will be
 	 * rejected.
 	 * <p>
 	 * If the <code>status</code> argument is not provided it will default to
 	 * <code>normal</code>.
 	 * 
-	 * @memberof CrocSDK.MediaAPI~MediaSession
-	 * @function CrocSDK.MediaAPI~MediaSession#close
-	 * @param {String}
-	 *            status The
-	 *            {@link CrocSDK.MediaAPI~MediaSession~OnCloseEvent.status status}
-	 *            of a session.
+	 * @method
+	 * @param {CrocSDK.MediaAPI~MediaSession~status} status
 	 */
-	CrocSDK.MediaSession.prototype.close = function(status) {
+	MediaSession.prototype.close = function(status) {
 		if (this.state === mediaSessionState.CLOSED) {
 			return;
 		}
@@ -1240,10 +1228,9 @@
 	 * If this event handler is not defined the session set-up will proceed 
 	 * regardless.
 	 * 
-	 * @memberof CrocSDK.MediaAPI~MediaSession
-	 * @event CrocSDK.MediaAPI~MediaSession#onConnecting
+	 * @event
 	 */
-	CrocSDK.MediaSession.prototype.onConnecting = function() {
+	MediaSession.prototype.onConnecting = function() {
 		// Do nothing
 	};
 
@@ -1255,10 +1242,9 @@
 	 * If this event handler is not defined the session set-up will proceed 
 	 * regardless.
 	 *  
-	 * @memberof CrocSDK.MediaAPI~MediaSession
-	 * @event CrocSDK.MediaAPI~MediaSession#onProvisional
+	 * @event
 	 */
-	CrocSDK.MediaSession.prototype.onProvisional = function() {
+	MediaSession.prototype.onProvisional = function() {
 		// Do nothing
 	};
 
@@ -1268,10 +1254,9 @@
 	 * If this event handler is not defined the session set-up will complete 
 	 * regardless.
 	 * 
-	 * @memberof CrocSDK.MediaAPI~MediaSession
-	 * @event CrocSDK.MediaAPI~MediaSession#onConnect
+	 * @event
 	 */
-	CrocSDK.MediaSession.prototype.onConnect = function() {
+	MediaSession.prototype.onConnect = function() {
 		// Do nothing
 	};
 
@@ -1282,10 +1267,9 @@
 	 * If this event handler is not defined the session set-up will proceed 
 	 * regardless.
 	 *   
-	 * @memberof CrocSDK.MediaAPI~MediaSession
-	 * @event CrocSDK.MediaAPI~MediaSession#onRemoteMediaReceived
+	 * @event
 	 */
-	CrocSDK.MediaSession.prototype.onRemoteMediaReceived = function() {
+	MediaSession.prototype.onRemoteMediaReceived = function() {
 		// Do nothing
 	};
 
@@ -1297,12 +1281,11 @@
 	 * "safe" (due to possible privacy or billing implications) will be rejected
 	 * automatically.
 	 * 
-	 * @memberof CrocSDK.MediaAPI~MediaSession
-	 * @event CrocSDK.MediaAPI~MediaSession#onRenegotiateRequest
+	 * @event
 	 * @param {CrocSDK.MediaAPI~MediaSession~RenegotiateRequestEvent}
 	 * [event] The event object associated with this event.
 	 */
-	CrocSDK.MediaSession.prototype.onRenegotiateRequest = function(event) {
+	MediaSession.prototype.onRenegotiateRequest = function(event) {
 		if (event.safe) {
 			// Nothing significant changed - accept
 			console.log('Auto-accepting re-INVITE (no significant changes)');
@@ -1327,12 +1310,11 @@
 	 * If this event is not handled the Crocodile RTC JavaScript Library will 
 	 * clean up the session internally.
 	 *  
-	 * @memberof CrocSDK.MediaAPI~MediaSession
-	 * @event CrocSDK.MediaAPI~MediaSession#onClose
+	 * @event
 	 * @param {CrocSDK.MediaAPI~MediaSession~CloseEvent}
 	 * [event] The event object associated with this event.
 	 */
-	CrocSDK.MediaSession.prototype.onClose = function() {
+	MediaSession.prototype.onClose = function() {
 		// Do nothing
 	};
 
@@ -1536,4 +1518,5 @@
 	 * [event] The event object associated with this event.
 	 */
 
+	CrocSDK.MediaSession = MediaSession;
 }(CrocSDK));
