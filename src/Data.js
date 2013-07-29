@@ -290,10 +290,13 @@
 	 * @fires CrocSDK.DataAPI#onData
 	 */
 	CrocSDK.DataAPI.prototype.init = function() {
-		var xmppCon = this.crocObject.xmppCon;
+		var croc = this.crocObject;
+		var xmppCon = croc.xmppCon;
 
-		// Handle SIP MESSAGE requests
-		this.crocObject.sipUA.on('newMessage', this._handleSipMessage.bind(this));
+		if (croc.features.indexOf(CrocSDK.C.FEATURES.PAGEDATA) >= 0) {
+			// Handle SIP MESSAGE requests
+			croc.sipUA.on('newMessage', this._handleSipMessage.bind(this));
+		}
 
 		if (xmppCon) {
 			// Process incoming XMPP message stanzas

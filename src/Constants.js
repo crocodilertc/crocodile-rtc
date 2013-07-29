@@ -1,5 +1,11 @@
 (function (CrocSDK) {
 	CrocSDK.C = {
+		FEATURES: {
+			AUDIO: 'audio',
+			VIDEO: 'video',
+			PAGEDATA: 'pagedata',
+			PRESENCE: 'presence'
+		},
 		NS: {
 			XHTML: 'http://www.w3.org/1999/xhtml',
 			XMPP_XHTML_IM: 'http://jabber.org/protocol/xhtml-im',

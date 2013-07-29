@@ -154,6 +154,21 @@
 	 * rejected the session).</li>
 	 * @property {Number} [acceptTimeout=300]
 	 * Time (in seconds) after which pending inbound sessions will be rejected.
+	 * @property {Array<String>} [features]
+	 * The CrocSDK library features to enable for the current application.
+	 * <p>
+	 * The available features are as follows:
+	 * <ul>
+	 * <li><code>video</code>: Request access to a webcam at startup (to
+	 * determine whether one is available).
+	 * <li><code>audio</code>: Request access to a microphone at startup (to
+	 * determine whether one is available).
+	 * <li><code>presence</code>: Start the presence API automatically.
+	 * <li><code>pagedata</code>: Advertise the ability to receive page-mode
+	 * messages.
+	 * </ul>
+	 * If not provided, the default behaviour is to enable the <code>video</code>,
+	 * <code>audio</code> and <code>pagedata</code> features.
 	 * @property {Function} [onConnected]
 	 * Handler for the {@link CrocSDK.Croc#event:onConnected onConnected} event.
 	 * @property {Function} [onDisconnected]

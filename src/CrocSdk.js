@@ -19,6 +19,7 @@ var CrocSDK = {};
 			idleTimeout : 300
 		},
 		expiresTime : 600,
+		features: ['audio', 'video', 'pagedata'],
 		register : false,
 		requireMatchingVersion : false,
 		start: true,
@@ -46,6 +47,7 @@ var CrocSDK = {};
 		data : [ 'object' ],
 		displayName : [ 'string' ],
 		expiresTime : [ 'number' ],
+		features: ['string[]'],
 		iceServers : [ 'object[]' ],
 		jQuery : [ 'function' ],
 		media : [ 'object' ],
@@ -180,6 +182,7 @@ var CrocSDK = {};
 	 * Used to test if browser supports method navigator.getUserMedia.
 	 * 
 	 * @private
+	 * @return {Boolean}
 	 */
 	function hasGetUserMedia() {
 		// navigator.getUserMedia() different browser variations
@@ -190,43 +193,62 @@ var CrocSDK = {};
 	 * Used to test if browser has the capabilities for audio and video.
 	 * 
 	 * @private
-	 * @param msrpConfigured
+	 * @param config
+	 * @returns {CrocSDK.Croc~Capabilities}
 	 */
-	function detectCapabilities(msrpConfigured) {
+	function detectCapabilities(config) {
 		var cap = {
-			"sip.audio" : true,
-			"sip.video" : true,
-			"sip.text" : true,
-			"sip.data" : true,
-			"croc.sdkversion" : "1"
+			"sip.audio": true,
+			"sip.video": true,
+			"sip.text": true,
+			"sip.data": true,
+			"croc.sdkversion": "1"
 		};
+		var features = config.features;
 
-		if (hasGetUserMedia()) {
-			var stopStream = function(stream) {
-				stream.stop();
-			};
+		if (features) {
+			// Update capabilities to reflect application's desired features
+			cap["sip.audio"] = features.indexOf(CrocSDK.C.FEATURES.AUDIO) >= 0;
+			cap["sip.video"] = features.indexOf(CrocSDK.C.FEATURES.VIDEO) >= 0;
+		}
 
-			// Detect microphone/webcam presence
-			// If we can get video, assume audio is also available
-			JsSIP.WebRTC.getUserMedia({
-				video : true
-			}, stopStream, function() {
-				cap["sip.video"] = false;
-				// Check for audio
+		if (!config.apiKey && !config.msrpRelaySet) {
+			cap["sip.text"] = false;
+			cap["sip.data"] = false;
+		}
+
+		if (!hasGetUserMedia()) {
+			cap["sip.audio"] = false;
+			cap["sip.video"] = false;
+
+			return cap;
+		}
+
+		var stopStream = function(stream) {
+			stream.stop();
+		};
+		var detectMicrophone = function() {
+			if (cap["sip.audio"]) {
 				JsSIP.WebRTC.getUserMedia({
-					audio : true
+					audio: true
 				}, stopStream, function() {
 					cap["sip.audio"] = false;
 				});
+			}
+		};
+
+		if (cap["sip.video"]) {
+			// Request access to webcam to determine whether one is present
+			JsSIP.WebRTC.getUserMedia({
+				video: true,
+				audio: true
+			}, stopStream, function() {
+				cap["sip.video"] = false;
+				// Fall back to microphone check
+				detectMicrophone();
 			});
 		} else {
-			cap["sip.audio"] = false;
-			cap["sip.video"] = false;
-		}
-
-		if (!msrpConfigured) {
-			cap["sip.text"] = false;
-			cap["sip.data"] = false;
+			detectMicrophone();
 		}
 
 		return cap;
@@ -664,10 +686,8 @@ var CrocSDK = {};
 		// Check for apiKey or sipProxySet
 		checkConfig(config);
 
-		var msrpConfigured = config.apiKey || config.msrpRelaySet;
-
 		var detectedConfig = {
-			capabilities : detectCapabilities(msrpConfigured),
+			capabilities : detectCapabilities(config),
 			register : !!config.address
 		};
 
@@ -692,6 +712,9 @@ var CrocSDK = {};
 		}
 		if (config.iceServers) {
 			mergedConfig.iceServers = config.iceServers;
+		}
+		if (config.features) {
+			mergedConfig.features = config.features;
 		}
 
 		// Initialise underlying APIs
@@ -864,6 +887,9 @@ var CrocSDK = {};
 			}
 			if (this.msrpManager) {
 				this.msrpManager.start();
+			}
+			if (croc.features.indexOf(CrocSDK.C.FEATURES.PRESENCE) >= 0) {
+				this.presence.start();
 			}
 		}
 	};
