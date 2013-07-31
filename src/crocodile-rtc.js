@@ -166,6 +166,8 @@
 	 * <li><code>presence</code>: Start the presence API automatically.
 	 * <li><code>pagedata</code>: Advertise the ability to receive page-mode
 	 * messages.
+	 * <li><code>transfer</code>: Advertise the ability to receive transfer
+	 * requests.
 	 * </ul>
 	 * If not provided, the default behaviour is to enable the <code>video</code>,
 	 * <code>audio</code> and <code>pagedata</code> features.

@@ -832,6 +832,7 @@ var CrocSDK = {};
 		// Run init configuration for apis
 		this.capability.init();
 		this.data.init();
+		this.media.init();
 		this.presence.init();
 
 		if (this.start) {

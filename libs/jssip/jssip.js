@@ -264,6 +264,7 @@ JsSIP.C= {
     REQUEST_TIMEOUT:          'Request Timeout',
     SIP_FAILURE_CODE:         'SIP Failure Code',
     INVALID_TARGET:           'Invalid Target',
+    INVALID_REFER_TO_TARGET:  'Invalid Refer-To Target',
     INTERNAL_ERROR:           'Internal Error',
 
     // SIP error causes
@@ -313,6 +314,14 @@ JsSIP.C= {
   REGISTER:   'REGISTER',
   UPDATE:     'UPDATE',
   SUBSCRIBE:  'SUBSCRIBE',
+  REFER:      'REFER',
+
+  // SIP Extensions
+  SIP_EXTENSIONS: {
+    TIMER: 'timer',             // RFC 4028
+    TARGET_DIALOG: 'tdialog',   // RFC 4538
+    GRUU: 'gruu'
+  },
 
   /* SIP Response Reasons
    * DOC: http://www.iana.org/assignments/sip-parameters
@@ -435,6 +444,17 @@ Exceptions= {
       this.code = 3;
       this.name = 'INVALID_STATE_ERROR';
       this.status = status;
+    };
+    exception.prototype = new Error();
+    return exception;
+  }()),
+
+  RemoteSupportError: (function(){
+    var exception = function(option) {
+      this.code = 4;
+      this.name = 'REMOTE_SUPPORT_ERROR';
+      this.option = option;
+      this.message = 'Remote UA does not support method/extension: ' + option;
     };
     exception.prototype = new Error();
     return exception;
@@ -927,6 +947,15 @@ function parseHeader(message, data, headerStart, headerEnd) {
       message.setHeader('allow', headerValue);
       parsed = message.parseHeader('allow');
       break;
+    case 'refer-to':
+    case 'r':
+      message.setHeader('refer-to', headerValue);
+      parsed = message.parseHeader('refer-to');
+      break;
+    case 'target-dialog':
+      message.setHeader('target-dialog', headerValue);
+      parsed = message.parseHeader('target-dialog');
+      break;
     default:
       // Do not parse this header.
       message.setHeader(headerName, headerValue);
@@ -1050,7 +1079,7 @@ OutgoingRequest = function(method, ruri, ua, params, extraHeaders, body) {
     from,
     call_id,
     cseq,
-    extra_extensions;
+    supported;
 
   params = params || {};
 
@@ -1111,9 +1140,16 @@ OutgoingRequest = function(method, ruri, ua, params, extraHeaders, body) {
   this.cseq = cseq;
   this.setHeader('cseq', cseq + ' ' + method);
 
+  // Allow
+  if (method !== JsSIP.C.CANCEL && method !== JsSIP.C.ACK) {
+    this.setHeader('allow', JsSIP.Utils.getAllowedMethods(ua));
+  }
+
   // Supported
-  extra_extensions = params.extra_extensions || '';
-  this.setHeader('supported', JsSIP.UA.C.SUPPORTED + extra_extensions);
+  if (method !== JsSIP.C.ACK) {
+    supported = JsSIP.Utils.getSupportedExtensions(ua, params.extra_supported);
+    this.setHeader('supported', supported.join(','));
+  }
 };
 
 OutgoingRequest.prototype = {
@@ -2480,7 +2516,7 @@ JsSIP.Transactions = Transactions;
  * @param {Enum} state JsSIP.Dialog.C.STATUS_EARLY / JsSIP.Dialog.C.STATUS_CONFIRMED
  */
 (function(JsSIP) {
-var Dialog,
+var DialogId, Dialog,
   LOG_PREFIX = JsSIP.name +' | '+ 'DIALOG' +' | ',
   C = {
     // Dialog states
@@ -2490,8 +2526,24 @@ var Dialog,
     DEFAULT_MIN_SE: 90
   };
 
+DialogId = function (call_id, local_tag, remote_tag) {
+  this.call_id = call_id;
+  this.local_tag = local_tag;
+  this.remote_tag = remote_tag;
+};
+DialogId.prototype.toString = function () {
+  return this.call_id + this.local_tag + this.remote_tag;
+};
+DialogId.prototype.toTargetDialogHeader = function () {
+  // See RFC 4538
+  // Note: the remote/local labels are from the perspective of the recipient
+  return this.call_id +
+      ';remote-tag=' + this.local_tag +
+      ';local-tag=' + this.remote_tag;
+};
+
 // RFC 3261 12.1
-Dialog = function(session, message, type, state) {
+Dialog = function(owner, message, type, state) {
   var contact;
 
   if(!message.hasHeader('contact')) {
@@ -2504,20 +2556,16 @@ Dialog = function(session, message, type, state) {
   } else {
     // Create confirmed dialog if state is not defined
     state = state || C.STATUS_CONFIRMED;
+    if (message.method === JsSIP.C.INVITE) {
+      this.last_invite_tx = message.server_transaction;
+    }
   }
 
   contact = message.parseHeader('contact');
 
   // RFC 3261 12.1.1
   if(type === 'UAS') {
-    this.id = {
-      call_id: message.call_id,
-      local_tag: message.to_tag,
-      remote_tag: message.from_tag,
-      toString: function() {
-        return this.call_id + this.local_tag + this.remote_tag;
-      }
-    };
+    this.id = new DialogId(message.call_id, message.to_tag, message.from_tag);
     this.state = state;
     this.remote_seqnum = message.cseq;
     this.local_uri = message.parseHeader('to').uri;
@@ -2527,14 +2575,7 @@ Dialog = function(session, message, type, state) {
   }
   // RFC 3261 12.1.2
   else if(type === 'UAC') {
-    this.id = {
-      call_id: message.call_id,
-      local_tag: message.from_tag,
-      remote_tag: message.to_tag,
-      toString: function() {
-        return this.call_id + this.local_tag + this.remote_tag;
-      }
-    };
+    this.id = new DialogId(message.call_id, message.from_tag, message.to_tag);
     this.state = state;
     this.local_seqnum = message.cseq;
     this.local_uri = message.parseHeader('from').uri;
@@ -2551,8 +2592,8 @@ Dialog = function(session, message, type, state) {
       timer_id: null
   };
 
-  this.session = session;
-  session.ua.dialogs[this.id.toString()] = this;
+  this.owner = owner;
+  owner.ua.dialogs[this.id.toString()] = this;
   console.log(LOG_PREFIX +'new ' + type + ' dialog created with status ' + (this.state === C.STATUS_EARLY ? 'EARLY': 'CONFIRMED'));
 };
 
@@ -2572,10 +2613,14 @@ Dialog.prototype = {
     }
   },
 
+  isConfirmed: function() {
+    return this.state === C.STATUS_CONFIRMED;
+  },
+
   terminate: function() {
     console.log(LOG_PREFIX +'dialog ' + this.id.toString() + ' deleted');
     this.clearSessionRefreshTimer();
-    delete this.session.ua.dialogs[this.id.toString()];
+    delete this.owner.ua.dialogs[this.id.toString()];
   },
 
   /**
@@ -2612,7 +2657,7 @@ Dialog.prototype = {
     request = new JsSIP.OutgoingRequest(
       method,
       this.remote_target,
-      this.session.ua, {
+      this.owner.ua, {
         'cseq': cseq,
         'call_id': this.id.call_id,
         'from_uri': this.local_uri,
@@ -2620,7 +2665,7 @@ Dialog.prototype = {
         'to_uri': this.remote_uri,
         'to_tag': this.id.remote_tag,
         'route_set': this.route_set,
-        'extra_extensions': JsSIP.Utils.getSessionExtensions(this.session, method)
+        'extra_supported': JsSIP.Utils.getSessionExtensions(this.owner, method)
       }, extraHeaders);
 
     request.dialog = this;
@@ -2639,7 +2684,7 @@ Dialog.prototype = {
 
     if(!this.remote_seqnum) {
       this.remote_seqnum = request.cseq;
-    } else if(request.method !== JsSIP.C.INVITE && request.cseq < this.remote_seqnum) {
+    } else if(request.cseq < this.remote_seqnum) {
         //Do not try to reply to an ACK request.
         if (request.method !== JsSIP.C.ACK) {
           request.reply(500);
@@ -2650,22 +2695,16 @@ Dialog.prototype = {
     }
 
     switch(request.method) {
-      // RFC3261 14.2 Modifying an Existing Session -UAS BEHAVIOR-
       case JsSIP.C.INVITE:
-        if(request.cseq < this.remote_seqnum) {
-          if(this.state === C.STATUS_EARLY) {
-            retryAfter = (Math.random() * 10 | 0) + 1;
-            request.reply(500, null, ['Retry-After:'+ retryAfter]);
-          } else {
-            request.reply(500);
-          }
+        // RFC3261 14.2 Modifying an Existing Session -UAS BEHAVIOR-
+        if(this.last_invite_tx &&
+            this.last_invite_tx.state === JsSIP.Transactions.C.STATUS_PROCEEDING) {
+          retryAfter = (Math.random() * 10 | 0) + 1;
+          request.reply(500, null, ['Retry-After:'+ retryAfter]);
           return false;
         }
-        // RFC3261 14.2
-        if(this.state === C.STATUS_EARLY) {
-          request.reply(491);
-          return false;
-        }
+        // Cache the transaction to check next time
+        this.last_invite_tx = request.server_transaction;
         break;
       case JsSIP.C.UPDATE:
         // RFC3311 5.2
@@ -2698,7 +2737,7 @@ Dialog.prototype = {
       return;
     }
 
-    if(!this.session.receiveRequest(request)) {
+    if(!this.owner.receiveRequest(request)) {
       return;
     }
 
@@ -2738,17 +2777,17 @@ Dialog.prototype = {
       timeout = interval / 2;
       action = function () {
         self.session_timer.timer_id = null;
-        self.session.emit('refresh', self.session, {});
+        self.owner.emit('refresh', self.owner, {});
       };
     } else {
       timeout = interval - Math.max(interval / 3, 32);
       action = function () {
         self.session_timer.timer_id = null;
-        self.session.sendBye({
+        self.owner.sendBye({
           status_code: 408,
           reason_phrase: JsSIP.C.causes.SESSION_TIMER
         });
-        self.session.ended('system', null, JsSIP.C.causes.SESSION_TIMER);
+        self.owner.ended('system', null, JsSIP.C.causes.SESSION_TIMER);
       };
     }
 
@@ -2823,6 +2862,7 @@ Dialog.prototype = {
 };
 
 Dialog.C = C;
+JsSIP.DialogId = DialogId;
 JsSIP.Dialog = Dialog;
 }(JsSIP));
 
@@ -3007,7 +3047,7 @@ InDialogRequestSender.prototype = {
   receiveResponse: function(response) {
     // RFC3261 14.1. Terminate the dialog if a 408 or 481 is received from a re-Invite.
     if (response.status_code === 408 || response.status_code === 481) {
-      if (this.request.method !== JsSIP.BYE) {
+      if (this.request.method !== JsSIP.C.BYE) {
         // Send a BYE as per section 12.2.1.2.
         this.applicant.session.sendBye({
           status_code: response.status_code,
@@ -3083,7 +3123,6 @@ Registrator.prototype = {
     options = options || {};
     extraHeaders = options.extraHeaders || [];
     extraHeaders.push('Contact: '+ this.contact + ';expires=' + this.expires);
-    extraHeaders.push('Allow: '+ JsSIP.Utils.getAllowedMethods(this.ua));
 
     this.request = new JsSIP.OutgoingRequest(JsSIP.C.REGISTER, this.registrar, this.ua, {
         'to_uri': this.to_uri,
@@ -3700,20 +3739,7 @@ DTMF.prototype.send = function(tone, options) {
     this.tone = tone;
   }
 
-  // Check duration
-  if (options.duration && !JsSIP.Utils.isDecimal(options.duration)) {
-    throw new TypeError('Invalid tone duration: '+ options.duration);
-  } else if (!options.duration) {
-    options.duration = C.DEFAULT_DURATION;
-  } else if (options.duration < C.MIN_DURATION) {
-    console.warn(LOG_PREFIX +'"duration" value is lower than the minimum allowed, setting it to '+ C.MIN_DURATION+ ' milliseconds');
-    options.duration = C.MIN_DURATION;
-  } else if (options.duration > C.MAX_DURATION) {
-    console.warn(LOG_PREFIX +'"duration" value is greater than the maximum allowed, setting it to '+ C.MAX_DURATION +' milliseconds');
-    options.duration = C.MAX_DURATION;
-  } else {
-    options.duration = Math.abs(options.duration);
-  }
+  // Duration is checked/corrected in RTCSession
   this.duration = options.duration;
 
   // Set event handlers
@@ -3887,7 +3913,6 @@ var Reinvite        = /**
     }
   
     extraHeaders.push('Contact: '+ this.session.contact);
-    extraHeaders.push('Allow: '+ JsSIP.Utils.getAllowedMethods(this.session.ua, true));
     if (sdp) {
       extraHeaders.push('Content-Type: application/sdp');
     }
@@ -4191,7 +4216,7 @@ var Reinvite        = /**
     this.session.dialog.addSessionTimerResponseHeaders(extraHeaders);
 
     extraHeaders.push('Contact: ' + self.session.contact);
-    extraHeaders.push('Allow: '+ JsSIP.Utils.getAllowedMethods(self.session.ua, true));
+    extraHeaders.push('Allow: '+ JsSIP.Utils.getAllowedMethods(self.session.ua));
     extraHeaders.push('Content-Type: application/sdp');
 
     var replyFailed = function () {
@@ -4301,7 +4326,6 @@ var Update          = /**
     }
   
     extraHeaders.push('Contact: '+ this.session.contact);
-    extraHeaders.push('Allow: '+ JsSIP.Utils.getAllowedMethods(this.session.ua, true));
     if (sdp) {
       extraHeaders.push('Content-Type: application/sdp');
     }
@@ -4493,6 +4517,9 @@ RTCSession = function(ua) {
   this.dialog = null;
   this.earlyDialogs = {};
   this.rtcMediaHandler = null;
+  this.tones = null;
+  this.allowed = null;
+  this.supported = null;
 
   // Session Timers
   this.timers = {
@@ -4502,13 +4529,12 @@ RTCSession = function(ua) {
     userNoAnswerTimer: null
   };
 
-  // Session info
+  // Session info (public properties)
   this.direction = null;
   this.local_identity = null;
   this.remote_identity = null;
   this.start_time = null;
   this.end_time = null;
-  this.allowed = null;
 
   // Custom session empty object for high level use
   this.data = {};
@@ -4650,7 +4676,7 @@ RTCSession.prototype.answer = function(options) {
 
     // rtcMediaHandler.createAnswer succeeded
     answerCreationSucceeded = function(body) {
-      var
+      var supported,
         // run for reply success callback
         replySucceeded = function() {
           var retransmissions = 1,
@@ -4708,7 +4734,10 @@ RTCSession.prototype.answer = function(options) {
         };
 
       extraHeaders.push('Contact: ' + self.contact);
-      extraHeaders.push('Allow: '+ JsSIP.Utils.getAllowedMethods(self.ua, true));
+      extraHeaders.push('Allow: '+ JsSIP.Utils.getAllowedMethods(self.ua));
+      supported = JsSIP.Utils.getSupportedExtensions(self.ua,
+          JsSIP.Utils.getSessionExtensions(self, JsSIP.C.INVITE));
+      extraHeaders.push('Supported: ' + supported.join(','));
 
       request.reply(200, null, extraHeaders,
         body,
@@ -4765,12 +4794,12 @@ RTCSession.prototype.answer = function(options) {
  * @param {Object} [options]
  */
 RTCSession.prototype.sendDTMF = function(tones, options) {
-  var timer, interToneGap,
-    possition = 0,
-    self = this,
-    ready = true;
+  var duration, interToneGap,
+    position = 0,
+    self = this;
 
   options = options || {};
+  duration = options.duration || null;
   interToneGap = options.interToneGap || null;
 
   if (tones === undefined) {
@@ -4783,11 +4812,27 @@ RTCSession.prototype.sendDTMF = function(tones, options) {
   }
 
   // Check tones
-  if (!tones || (typeof tones !== 'string' && typeof tones !== 'number') || !tones.toString().match(/^[0-9A-D#*]+$/i)) {
+  if (!tones || (typeof tones !== 'string' && typeof tones !== 'number') || !tones.toString().match(/^[0-9A-D#*,]+$/i)) {
     throw new TypeError('Invalid tones: '+ tones);
   }
 
   tones = tones.toString();
+
+  // Check duration
+  if (duration && !JsSIP.Utils.isDecimal(duration)) {
+    throw new TypeError('Invalid tone duration: '+ duration);
+  } else if (!duration) {
+    duration = DTMF.C.DEFAULT_DURATION;
+  } else if (duration < DTMF.C.MIN_DURATION) {
+    console.warn(LOG_PREFIX +'"duration" value is lower than the minimum allowed, setting it to '+ DTMF.C.MIN_DURATION+ ' milliseconds');
+    duration = DTMF.C.MIN_DURATION;
+  } else if (duration > DTMF.C.MAX_DURATION) {
+    console.warn(LOG_PREFIX +'"duration" value is greater than the maximum allowed, setting it to '+ DTMF.C.MAX_DURATION +' milliseconds');
+    duration = DTMF.C.MAX_DURATION;
+  } else {
+    duration = Math.abs(duration);
+  }
+  options.duration = duration;
 
   // Check interToneGap
   if (interToneGap && !JsSIP.Utils.isDecimal(interToneGap)) {
@@ -4801,32 +4846,43 @@ RTCSession.prototype.sendDTMF = function(tones, options) {
     interToneGap = Math.abs(interToneGap);
   }
 
-  function sendDTMF() {
-    var tone,
-      dtmf = new DTMF(self);
-
-    dtmf.on('failed', function(){ready = false;});
-
-    tone = tones[possition];
-    possition += 1;
-
-    dtmf.send(tone, options);
+  if (this.tones) {
+    // Tones are already queued, just add to the queue
+    this.tones += tones;
+    return;
   }
+
+  // New set of tones to start sending
+  this.tones = tones;
+
+  var sendDTMF = function () {
+    var tone, timeout,
+      tones = self.tones;
+
+    if (self.status === C.STATUS_TERMINATED || !tones || position >= tones.length) {
+      // Stop sending DTMF
+      self.tones = null;
+      return;
+    }
+
+    tone = tones[position];
+    position += 1;
+
+    if (tone === ',') {
+      timeout = 2000;
+    } else {
+      var dtmf = new DTMF(self);
+      dtmf.on('failed', function(){self.tones = null;});
+      dtmf.send(tone, options);
+      timeout = duration + interToneGap;
+    }
+
+    // Set timeout for the next tone
+    window.setTimeout(sendDTMF, timeout);
+  };
 
   // Send the first tone
   sendDTMF();
-
-  // Send the following tones
-  timer = window.setInterval(
-    function() {
-      if (self.status !== C.STATUS_TERMINATED && ready && tones.length > possition) {
-          sendDTMF();
-      } else {
-        window.clearInterval(timer);
-      }
-    },
-    interToneGap
-  );
 };
 
 
@@ -4884,8 +4940,44 @@ RTCSession.prototype.sendUpdate = function(options) {
   update.send(options);
 };
 
+
 /**
- * Checks whether the provided method is present in the Allow header received
+ * Send a REFER
+ *
+ * @param {URI} target
+ * @param {Object} [options]
+ * @param {Object} [options.eventHandlers]
+ * @param {String[]} [options.extraHeaders]
+ * @param {String} [options.contentType]
+ * @param {String} [options.body]
+ */
+RTCSession.prototype.sendRefer = function(refer_uri, options) {
+  var target = this.dialog.remote_target;
+
+  options = options || {};
+  options.targetDialog = this.dialog;
+
+  // First check: do they support REFER at all
+  if (!this.isMethodAllowed(JsSIP.C.REFER, false)) {
+    throw new JsSIP.Exceptions.RemoteSupportError(JsSIP.C.REFER);
+  }
+  // Next check: can we use out-of-dialog REFER
+  // We don't support in-dialog REFER, because it's nasty (see RFC 5589, 5057)
+  if (!this.isOptionSupported(JsSIP.C.SIP_EXTENSIONS.GRUU ||
+      !target.hasParam('gr'))) {
+    throw new JsSIP.Exceptions.RemoteSupportError(JsSIP.C.SIP_EXTENSIONS.GRUU);
+  }
+  if (!this.isOptionSupported(JsSIP.C.SIP_EXTENSIONS.TARGET_DIALOG)) {
+    throw new JsSIP.Exceptions.RemoteSupportError(JsSIP.C.SIP_EXTENSIONS.TARGET_DIALOG);
+  }
+
+  var refer = new JsSIP.Refer(this.ua);
+  refer.send(target, refer_uri, options);
+};
+
+
+/**
+ * Checks whether the provided method is present in an Allow header received
  * from the remote party.  If an Allow header has not been received, the
  * provided default is returned instead.
  * @param {String} method The SIP method to check.
@@ -4898,6 +4990,21 @@ RTCSession.prototype.isMethodAllowed = function(method, defaultValue) {
     return defaultValue;
   }
   if (this.allowed.indexOf(method) >= 0) {
+    return true;
+  }
+  return false;
+};
+
+
+/**
+ * Checks whether the provided option is present in a Supported header received
+ * from the remote party.  If a Supported header has not been received, the
+ * assumption is that no options are supported.
+ * @param {String} option The SIP option/extension to check.
+ * @returns {Boolean}
+ */
+RTCSession.prototype.isOptionSupported = function(option) {
+  if (this.supported && this.supported.indexOf(option) >= 0) {
     return true;
   }
   return false;
@@ -4950,7 +5057,11 @@ RTCSession.prototype.init_incoming = function(request) {
 
   // Store the allowed methods if provided
   if(request.hasHeader('allow')) {
-    this.allowed = request.parseHeader('allow').methods;
+    this.allowed = request.parseHeader('allow');
+  }
+  // Store the supported options if provided
+  if(request.hasHeader('supported')) {
+    this.supported = request.parseHeader('supported');
   }
 
   //Get the Expires header value if exists
@@ -5089,7 +5200,7 @@ RTCSession.prototype.connect = function(target, options) {
 
   requestParams = {
       from_tag: this.from_tag,
-      extra_extensions: JsSIP.Utils.getSessionExtensions(this, JsSIP.C.INVITE)
+      extra_supported: JsSIP.Utils.getSessionExtensions(this, JsSIP.C.INVITE)
   };
 
   this.contact = this.ua.contact.toString({
@@ -5108,7 +5219,6 @@ RTCSession.prototype.connect = function(target, options) {
   request = new JsSIP.OutgoingRequest(JsSIP.C.INVITE, target, this.ua, requestParams, extraHeaders);
   this.request = request;
   request.setHeader('contact', this.contact);
-  request.setHeader('allow', JsSIP.Utils.getAllowedMethods(this.ua, true));
   request.setHeader('content-type', 'application/sdp');
 
   this.id = this.request.call_id + this.from_tag;
@@ -5502,7 +5612,11 @@ RTCSession.prototype.receiveInviteResponse = function(response) {
 
       // Store the allowed methods if provided
       if(response.hasHeader('allow')) {
-        this.allowed = response.parseHeader('allow').methods;
+        this.allowed = response.parseHeader('allow');
+      }
+      // Store the supported options if provided
+      if(response.hasHeader('supported')) {
+        this.supported = response.parseHeader('supported');
       }
 
       this.dialog.processSessionTimerHeaders(response);
@@ -6035,8 +6149,9 @@ var UA,
      * corresponding event handler is set.
      */
     EVENT_METHODS: {
-      'newRTCSession': 'INVITE',
-      'newMessage': 'MESSAGE'
+      'newRTCSession': 'INVITE,UPDATE',
+      'newMessage': 'MESSAGE',
+      'newRefer': 'REFER'
     },
 
     ALLOWED_METHODS: [
@@ -6051,21 +6166,28 @@ var UA,
       'application/dtmf-relay'
     ],
 
-    SUPPORTED: 'path, outbound, gruu',
+    SUPPORTED_EXTENSIONS: [
+      'path',
+      'outbound',
+      'gruu'
+    ],
 
-    /* Session events and corresponding SIP extensions.
-     * Dynamically added to 'Supported' header field if the
-     * corresponding event handler is set.
+    /*
+     * Additional SIP extensions that are supported if the corresponding UA
+     * event is handled.
+     * Dynamically added to 'Supported' header field.
      */
-    SESSION_EVENT_EXTENSIONS: {
-      'refresh': 'timer'
+    EVENT_EXTENSIONS: {
+      'tdialog': 'newRefer'
     },
 
     /*
-     * Limits the methods on which a given extension is listed as supported.
+     * Additional SIP extensions that are supported if the corresponding Session
+     * event is handled.
+     * Dynamically added to 'Supported' header field.
      */
-    EXTENSION_METHODS: {
-      'timer': ['INVITE', 'UPDATE']
+    SESSION_EVENT_EXTENSIONS: {
+      'timer': 'refresh'
     },
 
     MAX_FORWARDS: 69,
@@ -6081,7 +6203,8 @@ UA = function(configuration) {
     'registrationFailed',
     'newRTCSession',
     'newMessage',
-    'newOptions'
+    'newOptions',
+    'newRefer'
   ];
 
   // Set Accepted Body Types
@@ -6099,6 +6222,7 @@ UA = function(configuration) {
   this.applicants = {};
 
   this.sessions = {};
+  this.refers = {};
   this.transport = null;
   this.contact = null;
   this.status = C.STATUS_INIT;
@@ -6222,7 +6346,7 @@ UA.prototype.sendMessage = function(target, body, options) {
  *
  */
 UA.prototype.stop = function() {
-  var session, applicant,
+  var session, refer, applicant,
     ua = this;
 
   console.log(LOG_PREFIX +'user requested closure...');
@@ -6242,6 +6366,11 @@ UA.prototype.stop = function() {
   for(session in this.sessions) {
     console.log(LOG_PREFIX +'closing session ' + session);
     this.sessions[session].terminate();
+  }
+
+  // Run  _close_ on every Refer
+  for(refer in this.refers) {
+    this.refers[refer].close();
   }
 
   // Run  _close_ on every applicant
@@ -6466,6 +6595,23 @@ UA.prototype.receiveRequest = function(request) {
     return;
   }
 
+  // Check Require header (RFC 3261 section 8.2.2.3)
+  if(request.hasHeader('require')) {
+    var supported = JsSIP.Utils.getSupportedExtensions(this);
+    var tokens = request.parseHeader('require');
+
+    for (var idx = 0, len = tokens.length; idx < len; idx++) {
+      var token = tokens[idx];
+      if (supported.indexOf(token) < 0 && !C.SESSION_EVENT_EXTENSIONS[token]) {
+        // Unrecognised option-tag/extension
+        if (request.method !== JsSIP.C.ACK) {
+          request.reply_sl(420);
+        }
+        return;
+      }
+    }
+  }
+
   // Create the server transaction
   if(method === JsSIP.C.INVITE) {
     new JsSIP.Transactions.InviteServerTransaction(request, this);
@@ -6481,7 +6627,8 @@ UA.prototype.receiveRequest = function(request) {
   if(method === JsSIP.C.OPTIONS) {
     var extraHeaders = [
       'Allow: '+ JsSIP.Utils.getAllowedMethods(this),
-      'Accept: '+ C.ACCEPTED_BODY_TYPES
+      'Accept: '+ C.ACCEPTED_BODY_TYPES,
+      'Supported: ' + JsSIP.Utils.getSupportedExtensions(this).join(',')
     ];
     
     if (!this.checkEvent('newOptions') || this.listeners('newOptions').length === 0) {
@@ -6543,8 +6690,12 @@ UA.prototype.receiveRequest = function(request) {
          * and without To tag.
          */
         break;
+      case JsSIP.C.REFER:
+        var refer = new JsSIP.Refer(this);
+        refer.init_incoming(request);
+        break;
       default:
-        request.reply(405);
+        request.reply(405, null, ['Allow: '+ JsSIP.Utils.getAllowedMethods(this)]);
         break;
     }
   } else {
@@ -7391,7 +7542,7 @@ Utils= {
     return '192.0.2.' + getOctet(1, 254);
   },
 
-  getAllowedMethods: function(ua, inDialog) {
+  getAllowedMethods: function(ua) {
     var event,
       allowed = JsSIP.UA.C.ALLOWED_METHODS.toString();
 
@@ -7401,24 +7552,34 @@ Utils= {
       }
     }
 
-    if (inDialog) {
-      allowed += ',' + JsSIP.C.UPDATE;
-    }
-
     return allowed;
   },
 
-  getSessionExtensions: function(session, method) {
-    var event, option,
-      supported = '';
+  getSupportedExtensions: function(ua, extraExtensions) {
+    var extension, event,
+      supported = JsSIP.UA.C.SUPPORTED_EXTENSIONS.slice();
 
-    for (event in JsSIP.UA.C.SESSION_EVENT_EXTENSIONS) {
+    for (extension in JsSIP.UA.C.EVENT_EXTENSIONS) {
+      event = JsSIP.UA.C.EVENT_EXTENSIONS[extension];
+      if (ua.checkEvent(event) && ua.listeners(event).length > 0) {
+        supported.push(extension);
+      }
+    }
+
+    if (extraExtensions) {
+      return supported.concat(extraExtensions);
+    }
+    return supported;
+  },
+
+  getSessionExtensions: function(session) {
+    var extension, event,
+      supported = [];
+
+    for (extension in JsSIP.UA.C.SESSION_EVENT_EXTENSIONS) {
+      event = JsSIP.UA.C.SESSION_EVENT_EXTENSIONS[extension];
       if (session.checkEvent(event) && session.listeners(event).length > 0) {
-        // Check whether this extension should be added to this method
-        option = JsSIP.UA.C.SESSION_EVENT_EXTENSIONS[event];
-        if (JsSIP.UA.C.EXTENSION_METHODS[option].indexOf(method) >= 0) {
-          supported += ', ' + option;
-        }
+        supported.push(extension);
       }
     }
 
@@ -8105,6 +8266,395 @@ JsSIP.WebRTC = WebRTC;
 
 
 
+/**
+ * @fileoverview Refer
+ */
+
+/**
+ * @param {JsSIP} JsSIP - The JsSIP namespace
+ */
+(function(JsSIP) {
+  var Refer;
+
+  /**
+   * @class Class creating SIP REFER request.
+   * @augments EventEmitter
+   * @param {JsSIP.UA} ua
+   */
+  Refer = function(ua) {
+    this.ua = ua;
+    this.targetDialog = null;
+    this.closed = false;
+    this.request = null;
+    this.local_tag = null;
+    this.remote_tag = null;
+    this.id = null;
+    this.contact = null;
+    this.accepted = false;
+    this.rejected = false;
+
+    // Public properties
+    this.direction = null;
+    this.local_identity = null;
+    this.remote_identity = null;
+    this.refer_uri = null;
+
+    // Custom Refer empty object for high level use
+    this.data = {};
+  };
+  Refer.prototype = new JsSIP.EventEmitter();
+
+  Refer.prototype.send = function(target, refer_uri, options) {
+    var request_sender, event, contentType, eventHandlers, extraHeaders, request,
+      events = [
+        'accepted',
+        'failed',
+        'notify'
+      ],
+      failCause = null;
+
+    if (target === undefined || refer_uri === undefined) {
+      throw new TypeError('Not enough arguments');
+    }
+
+    this.initEvents(events);
+
+    // Get call options
+    options = options || {};
+    extraHeaders = options.extraHeaders || [];
+    eventHandlers = options.eventHandlers || {};
+    contentType = options.contentType || 'text/plain';
+
+    // Set event handlers
+    for (event in eventHandlers) {
+      this.on(event, eventHandlers[event]);
+    }
+
+    // Check target validity
+    try {
+      target = JsSIP.Utils.normalizeURI(target, this.ua.configuration.hostport_params);
+    } catch(e) {
+      target = JsSIP.URI.parse(JsSIP.C.INVALID_TARGET_URI);
+      failCause = JsSIP.C.causes.INVALID_TARGET;
+    }
+
+    // Check refer-to validity
+    try {
+      refer_uri = JsSIP.Utils.normalizeURI(refer_uri, this.ua.configuration.hostport_params);
+    } catch(e) {
+      refer_uri = JsSIP.URI.parse(JsSIP.C.INVALID_TARGET_URI);
+      failCause = JsSIP.C.causes.INVALID_REFER_TO_TARGET;
+    }
+
+    // Refer parameter initialization
+    this.direction = 'outgoing';
+    this.local_identity = this.ua.configuration.uri;
+    this.remote_identity = target;
+    this.refer_uri = refer_uri;
+    this.local_tag = JsSIP.Utils.newTag();
+    this.contact = this.ua.contact.toString();
+
+    request = new JsSIP.OutgoingRequest(JsSIP.C.REFER, target, this.ua,
+        {from_tag: this.local_tag}, extraHeaders, options.body);
+    this.request = request;
+    this.id = request.call_id + request.from_tag;
+
+    this.ua.refers[this.id] = this;
+
+    request.setHeader('contact', this.contact);
+    request.setHeader('refer-to', refer_uri);
+
+    if (options.targetDialog) {
+      this.targetDialog = options.targetDialog;
+      request.setHeader('require', JsSIP.C.SIP_EXTENSIONS.TARGET_DIALOG);
+      request.setHeader('target-dialog', options.targetDialog.id.toTargetDialogHeader());
+    }
+
+    if(options.body) {
+      request.setHeader('content-type', contentType);
+    }
+
+    request_sender = new JsSIP.RequestSender(this, this.ua);
+
+    this.ua.emit('newRefer', this.ua, {
+      originator: 'local',
+      refer: this,
+      request: this.request
+    });
+
+    if (failCause) {
+      this.emit('failed', this, {
+        originator: 'local',
+        cause: failCause
+      });
+    } else {
+      request_sender.send();
+    }
+  };
+
+  /**
+  * @private
+  */
+  Refer.prototype.receiveResponse = function(response) {
+    var cause;
+
+    if(this.closed) {
+      return;
+    }
+    switch(true) {
+      case /^1[0-9]{2}$/.test(response.status_code):
+        // Ignore provisional responses.
+        break;
+
+      case /^2[0-9]{2}$/.test(response.status_code):
+        // Just close for now, but we should be receiving NOTIFYs on this dialog
+        this.close();
+        this.emit('accepted', this, {
+          originator: 'remote',
+          response: response
+        });
+        break;
+
+      default:
+        this.close();
+        cause = JsSIP.Utils.sipErrorCause(response.status_code);
+        this.emit('failed', this, {
+          originator: 'remote',
+          response: response,
+          cause: cause
+        });
+        break;
+    }
+  };
+
+  /**
+  * @private
+  */
+  Refer.prototype.onRequestTimeout = function() {
+    if(this.closed) {
+      return;
+    }
+    this.close();
+    this.emit('failed', this, {
+      originator: 'system',
+      cause: JsSIP.C.causes.REQUEST_TIMEOUT
+    });
+  };
+
+  /**
+  * @private
+  */
+  Refer.prototype.onTransportError = function() {
+    if(this.closed) {
+      return;
+    }
+    this.close();
+    this.emit('failed', this, {
+      originator: 'system',
+      cause: JsSIP.C.causes.CONNECTION_ERROR
+    });
+  };
+
+  /**
+  * @private
+  */
+  Refer.prototype.close = function() {
+    // Terminate confirmed dialog
+    if (this.dialog) {
+      this.dialog.terminate();
+      delete this.dialog;
+    }
+
+    this.closed = true;
+    delete this.ua.refers[this];
+  };
+
+  /**
+   * @private
+   * @param {IncomingRequest} request
+   */
+  Refer.prototype.init_incoming = function(request) {
+    var session = null;
+
+    this.direction = 'incoming';
+    this.request = request;
+    this.remote_tag = request.from_tag;
+    this.id = request.call_id + request.from_tag;
+    this.contact = this.ua.contact.toString();
+    this.local_identity = request.to.uri;
+    this.remote_identity = request.from.uri;
+
+    // Check Refer-To header
+    if (!request.hasHeader('refer-to')) {
+      request.reply(400, 'Missing Refer-To header field');
+      return;
+    }
+    if (request.countHeader('refer-to') > 1) {
+      request.reply(400, 'Too many Refer-To header fields');
+      return;
+    }
+    this.refer_uri = request.parseHeader('refer-to').uri;
+
+    // Process Target-Dialog header (if present)
+    if (request.hasHeader('target-dialog')) {
+      var td = request.parseHeader('target-dialog');
+      // Local/remote labels should be from recipient's perspective
+      var did = new JsSIP.DialogId(td.call_id, td.local_tag, td.remote_tag);
+      this.targetDialog = this.ua.dialogs[did.toString()] || null;
+    }
+
+    if (this.targetDialog && this.targetDialog.isConfirmed()) {
+      session = this.targetDialog.owner;
+      // Sanity check
+      if (session.dialog !== this.targetDialog ||
+          !session instanceof JsSIP.RTCSession) {
+        session = null;
+      }
+    }
+
+    // Set the to_tag before replying with a response code that will create a dialog.
+    this.local_tag = request.to_tag = JsSIP.Utils.newTag();
+    this.dialog = new JsSIP.Dialog(this, request, 'UAS');
+    if(!this.dialog.id) {
+      request.reply(500, 'Missing Contact header field');
+      return;
+    }
+
+    this.ua.refers[this.id] = this;
+
+    this.ua.emit('newRefer', this.ua, {
+      originator: 'remote',
+      refer: this,
+      request: request,
+      session: session
+    });
+
+    if (!this.accepted && !this.rejected) {
+      var extraHeaders = ['Contact: ' + this.contact];
+      request.reply(202, null, extraHeaders);
+    }
+  };
+
+  /**
+   * Call the refer URI. The referrer will be notified of the progress and
+   * result of the call establishment process.
+   *
+   * @param {Object} [options]
+   * Call options as used with the <code>UA.call</code> method.
+   *
+   * @throws {TypeError}
+   * @throws {JsSIP.Exceptions.InvalidTargetError}
+   */
+  Refer.prototype.call = function(options) {
+    var session,
+      uri = this.refer_uri;
+
+    if (uri.scheme !== JsSIP.C.SIP) {
+      throw new JsSIP.Exceptions.InvalidTargetError(uri);
+    }
+
+    session = new JsSIP.RTCSession(this.ua);
+    session.connect(uri, options);
+
+    // TODO: set up handlers to send appropriate notify messages
+  };
+
+  /**
+   * Accept the incoming Refer. Use this for non-SIP refer URIs; for SIP URIs
+   * use the <code>call</code> method instead.
+   * <p>
+   * After calling this method, the application should call the
+   * <code>notify</code> method to inform the referrer of the progress/result
+   * of the refer. This is handled automatically if the <code>call</code>
+   * method is used instead.
+   * 
+   * @param {Object} [options]
+   * @param {String[]} [options.extraHeaders]
+   * Extra headers to add to the response.
+   * @param {String} [options.body]
+   * A message body to include in the response.
+   */
+  Refer.prototype.accept = function(options) {
+    options = options || {};
+
+    var
+      extraHeaders = options.extraHeaders || [],
+      body = options.body;
+
+    if (this.direction !== 'incoming') {
+      throw new TypeError('Invalid method "accept" for an outgoing refer');
+    }
+
+    extraHeaders.push('Contact: ' + this.contact);
+
+    this.request.reply(200, null, extraHeaders, body);
+    this.accepted = true;
+  };
+
+  /**
+   * Reject the incoming Refer.
+   *
+   * @param {Object} [options]
+   * @param {Number} [options.status_code]
+   * @param {String} [options.reason_phrase]
+   * @param {String[]} [options.extraHeaders]
+   * @param {String} [options.body]
+   */
+  Refer.prototype.reject = function(options) {
+    options = options || {};
+
+    var
+      status_code = options.status_code || 480,
+      reason_phrase = options.reason_phrase,
+      extraHeaders = options.extraHeaders || [],
+      body = options.body;
+
+    if (this.direction !== 'incoming') {
+      throw new TypeError('Invalid method "reject" for an outgoing refer');
+    }
+
+    if (status_code < 300 || status_code >= 700) {
+      throw new TypeError('Invalid status_code: '+ status_code);
+    }
+
+    this.request.reply(status_code, reason_phrase, extraHeaders, body);
+    this.rejected = true;
+  };
+
+  /**
+   * Notify the referrer of the current refer progress, or final result.
+   * <p>
+   * The application should either provide a SIP status code, or a message body
+   * of type <code>message/sipfrag</code>.  If neither is provided, a
+   * <code>100 Trying</code> message will be constructed.
+   *
+   * @param {Object} [options]
+   * @param {Number} [options.status_code]
+   * @param {String} [options.reason_phrase]
+   * @param {String[]} [options.extraHeaders]
+   * @param {String} [options.body]
+   */
+  Refer.prototype.notify = function(options) {
+    options = options || {};
+    // TODO
+  };
+
+  /**
+   * Receives further messages on the Refer dialog (i.e. NOTIFYs for outgoing
+   * refers, and possibly SUBSCRIBEs for incoming refers).
+   * @private
+   * @param {IncomingRequest} request
+   */
+  Refer.prototype.receiveRequest = function(request) {
+    // TODO
+    request.reply(481);
+  };
+
+  JsSIP.Refer = Refer;
+}(JsSIP));
+
+
+
 window.JsSIP = JsSIP;
 }(window));
 
@@ -8266,6 +8816,7 @@ JsSIP.Grammar = (function(){
         "allow_method": parse_allow_method,
         "Allow_Events": parse_Allow_Events,
         "Call_ID": parse_Call_ID,
+        "call_id": parse_call_id,
         "Contact": parse_Contact,
         "contact_param": parse_contact_param,
         "name_addr": parse_name_addr,
@@ -8325,6 +8876,7 @@ JsSIP.Grammar = (function(){
         "option_tag": parse_option_tag,
         "Record_Route": parse_Record_Route,
         "rec_route": parse_rec_route,
+        "Refer_To": parse_Refer_To,
         "Require": parse_Require,
         "Route": parse_Route,
         "route_param": parse_route_param,
@@ -8337,6 +8889,10 @@ JsSIP.Grammar = (function(){
         "event_reason_value": parse_event_reason_value,
         "Subject": parse_Subject,
         "Supported": parse_Supported,
+        "Target_Dialog": parse_Target_Dialog,
+        "td_param": parse_td_param,
+        "remote_param": parse_remote_param,
+        "local_param": parse_local_param,
         "To": parse_To,
         "to_param": parse_to_param,
         "Via": parse_Via,
@@ -15942,13 +16498,14 @@ JsSIP.Grammar = (function(){
       
       function parse_Allow() {
         var result0, result1, result2, result3;
-        var pos0, pos1;
+        var pos0, pos1, pos2;
         
         pos0 = pos;
+        pos1 = pos;
         result0 = parse_allow_method();
         if (result0 !== null) {
           result1 = [];
-          pos1 = pos;
+          pos2 = pos;
           result2 = parse_COMMA();
           if (result2 !== null) {
             result3 = parse_allow_method();
@@ -15956,15 +16513,15 @@ JsSIP.Grammar = (function(){
               result2 = [result2, result3];
             } else {
               result2 = null;
-              pos = pos1;
+              pos = pos2;
             }
           } else {
             result2 = null;
-            pos = pos1;
+            pos = pos2;
           }
           while (result2 !== null) {
             result1.push(result2);
-            pos1 = pos;
+            pos2 = pos;
             result2 = parse_COMMA();
             if (result2 !== null) {
               result3 = parse_allow_method();
@@ -15972,21 +16529,28 @@ JsSIP.Grammar = (function(){
                 result2 = [result2, result3];
               } else {
                 result2 = null;
-                pos = pos1;
+                pos = pos2;
               }
             } else {
               result2 = null;
-              pos = pos1;
+              pos = pos2;
             }
           }
           if (result1 !== null) {
             result0 = [result0, result1];
           } else {
             result0 = null;
-            pos = pos0;
+            pos = pos1;
           }
         } else {
           result0 = null;
+          pos = pos1;
+        }
+        if (result0 !== null) {
+          result0 = (function(offset) {
+        				 data = data.methods; })(pos0);
+        }
+        if (result0 === null) {
           pos = pos0;
         }
         return result0;
@@ -16062,6 +16626,22 @@ JsSIP.Grammar = (function(){
       }
       
       function parse_Call_ID() {
+        var result0;
+        var pos0;
+        
+        pos0 = pos;
+        result0 = parse_call_id();
+        if (result0 !== null) {
+          result0 = (function(offset, call_id) {
+                      data = call_id; })(pos0, result0);
+        }
+        if (result0 === null) {
+          pos = pos0;
+        }
+        return result0;
+      }
+      
+      function parse_call_id() {
         var result0, result1, result2;
         var pos0, pos1, pos2;
         
@@ -16104,7 +16684,7 @@ JsSIP.Grammar = (function(){
         }
         if (result0 !== null) {
           result0 = (function(offset) {
-                      data = input.substring(pos, offset); })(pos0);
+                      return input.substring(pos, offset); })(pos0);
         }
         if (result0 === null) {
           pos = pos0;
@@ -18597,6 +19177,73 @@ JsSIP.Grammar = (function(){
         return result0;
       }
       
+      function parse_Refer_To() {
+        var result0, result1, result2, result3;
+        var pos0, pos1, pos2;
+        
+        pos0 = pos;
+        pos1 = pos;
+        result0 = parse_SIP_URI_noparams();
+        if (result0 === null) {
+          result0 = parse_name_addr();
+        }
+        if (result0 !== null) {
+          result1 = [];
+          pos2 = pos;
+          result2 = parse_SEMI();
+          if (result2 !== null) {
+            result3 = parse_generic_param();
+            if (result3 !== null) {
+              result2 = [result2, result3];
+            } else {
+              result2 = null;
+              pos = pos2;
+            }
+          } else {
+            result2 = null;
+            pos = pos2;
+          }
+          while (result2 !== null) {
+            result1.push(result2);
+            pos2 = pos;
+            result2 = parse_SEMI();
+            if (result2 !== null) {
+              result3 = parse_generic_param();
+              if (result3 !== null) {
+                result2 = [result2, result3];
+              } else {
+                result2 = null;
+                pos = pos2;
+              }
+            } else {
+              result2 = null;
+              pos = pos2;
+            }
+          }
+          if (result1 !== null) {
+            result0 = [result0, result1];
+          } else {
+            result0 = null;
+            pos = pos1;
+          }
+        } else {
+          result0 = null;
+          pos = pos1;
+        }
+        if (result0 !== null) {
+          result0 = (function(offset) {
+                          try {
+                            data = new JsSIP.NameAddrHeader(data.uri, data.display_name, data.params);
+                          } catch(e) {
+                            data = -1;
+                          }})(pos0);
+        }
+        if (result0 === null) {
+          pos = pos0;
+        }
+        return result0;
+      }
+      
       function parse_Require() {
         var result0, result1, result2, result3;
         var pos0, pos1, pos2;
@@ -19263,6 +19910,165 @@ JsSIP.Grammar = (function(){
         if (result0 !== null) {
           result0 = (function(offset) {
                        data = data.options || []; })(pos0);
+        }
+        if (result0 === null) {
+          pos = pos0;
+        }
+        return result0;
+      }
+      
+      function parse_Target_Dialog() {
+        var result0, result1, result2, result3;
+        var pos0, pos1, pos2;
+        
+        pos0 = pos;
+        pos1 = pos;
+        result0 = parse_call_id();
+        if (result0 !== null) {
+          result1 = [];
+          pos2 = pos;
+          result2 = parse_SEMI();
+          if (result2 !== null) {
+            result3 = parse_td_param();
+            if (result3 !== null) {
+              result2 = [result2, result3];
+            } else {
+              result2 = null;
+              pos = pos2;
+            }
+          } else {
+            result2 = null;
+            pos = pos2;
+          }
+          while (result2 !== null) {
+            result1.push(result2);
+            pos2 = pos;
+            result2 = parse_SEMI();
+            if (result2 !== null) {
+              result3 = parse_td_param();
+              if (result3 !== null) {
+                result2 = [result2, result3];
+              } else {
+                result2 = null;
+                pos = pos2;
+              }
+            } else {
+              result2 = null;
+              pos = pos2;
+            }
+          }
+          if (result1 !== null) {
+            result0 = [result0, result1];
+          } else {
+            result0 = null;
+            pos = pos1;
+          }
+        } else {
+          result0 = null;
+          pos = pos1;
+        }
+        if (result0 !== null) {
+          result0 = (function(offset, call_id) {
+                           data.call_id = call_id; })(pos0, result0[0]);
+        }
+        if (result0 === null) {
+          pos = pos0;
+        }
+        return result0;
+      }
+      
+      function parse_td_param() {
+        var result0;
+        
+        result0 = parse_remote_param();
+        if (result0 === null) {
+          result0 = parse_local_param();
+          if (result0 === null) {
+            result0 = parse_generic_param();
+          }
+        }
+        return result0;
+      }
+      
+      function parse_remote_param() {
+        var result0, result1, result2;
+        var pos0, pos1;
+        
+        pos0 = pos;
+        pos1 = pos;
+        if (input.substr(pos, 10).toLowerCase() === "remote-tag") {
+          result0 = input.substr(pos, 10);
+          pos += 10;
+        } else {
+          result0 = null;
+          if (reportFailures === 0) {
+            matchFailed("\"remote-tag\"");
+          }
+        }
+        if (result0 !== null) {
+          result1 = parse_EQUAL();
+          if (result1 !== null) {
+            result2 = parse_token();
+            if (result2 !== null) {
+              result0 = [result0, result1, result2];
+            } else {
+              result0 = null;
+              pos = pos1;
+            }
+          } else {
+            result0 = null;
+            pos = pos1;
+          }
+        } else {
+          result0 = null;
+          pos = pos1;
+        }
+        if (result0 !== null) {
+          result0 = (function(offset, tag) {
+                           data.remote_tag = tag; })(pos0, result0[2]);
+        }
+        if (result0 === null) {
+          pos = pos0;
+        }
+        return result0;
+      }
+      
+      function parse_local_param() {
+        var result0, result1, result2;
+        var pos0, pos1;
+        
+        pos0 = pos;
+        pos1 = pos;
+        if (input.substr(pos, 9).toLowerCase() === "local-tag") {
+          result0 = input.substr(pos, 9);
+          pos += 9;
+        } else {
+          result0 = null;
+          if (reportFailures === 0) {
+            matchFailed("\"local-tag\"");
+          }
+        }
+        if (result0 !== null) {
+          result1 = parse_EQUAL();
+          if (result1 !== null) {
+            result2 = parse_token();
+            if (result2 !== null) {
+              result0 = [result0, result1, result2];
+            } else {
+              result0 = null;
+              pos = pos1;
+            }
+          } else {
+            result0 = null;
+            pos = pos1;
+          }
+        } else {
+          result0 = null;
+          pos = pos1;
+        }
+        if (result0 !== null) {
+          result0 = (function(offset, tag) {
+                           data.local_tag = tag; })(pos0, result0[2]);
         }
         if (result0 === null) {
           pos = pos0;

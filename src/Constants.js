@@ -4,7 +4,8 @@
 			AUDIO: 'audio',
 			VIDEO: 'video',
 			PAGEDATA: 'pagedata',
-			PRESENCE: 'presence'
+			PRESENCE: 'presence',
+			TRANSFER: 'transfer'
 		},
 		NS: {
 			XHTML: 'http://www.w3.org/1999/xhtml',

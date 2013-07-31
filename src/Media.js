@@ -52,14 +52,22 @@
 	 *   </pre>
 	 * 
 	 * @constructor
+	 * @alias CrocSDK.MediaAPI
 	 * @param {CrocSDK.Croc} crocObject - The parent {@link CrocSDK.Croc Croc}
 	 * object.
 	 * @param {CrocSDK~Config} config - The Croc object configuration.
 	 */
-	CrocSDK.MediaAPI = function(crocObject, config) {
+	var MediaAPI = function(crocObject, config) {
 		this.crocObject = crocObject;
 		this.mediaSessions = [];
 		config.jQuery.extend(this, config.media);
+	};
+
+	MediaAPI.prototype.init = function() {
+		var croc = this.crocObject;
+		if (croc.features.indexOf(CrocSDK.C.FEATURES.TRANSFER) >= 0) {
+			croc.sipUA.on('newRefer', this._handleRefer.bind(this));
+		}
 	};
 
 	/**
@@ -73,7 +81,7 @@
 	 * @param sdpInvalid
 	 * @fires onMediaSession
 	 */
-	CrocSDK.MediaAPI.prototype.init_incoming = function(sipSession, sipRequest,
+	MediaAPI.prototype.init_incoming = function(sipSession, sipRequest,
 			sdp, sdpValid, sdpInvalid) {
 		if (this.hasOwnProperty('onMediaSession')) {
 			var mediaApi = this;
@@ -123,7 +131,7 @@
 	/**
 	 * @private
 	 */
-	CrocSDK.MediaAPI.prototype._updateIceServers = function() {
+	MediaAPI.prototype._updateIceServers = function() {
 		var croc = this.crocObject;
 		var iceServers = croc.iceServers;
 		if (croc.dynamicIceServers) {
@@ -135,6 +143,53 @@
 		for ( var i = 0, len = this.mediaSessions.length; i < len; i++) {
 			this.mediaSessions[i]._updateIceServers(iceServers);
 		}
+	};
+
+	/**
+	 * Handles the JsSIP <code>newRefer</code> event.
+	 * @private
+	 * @param {Object} event - The JsSIP event object.
+	 */
+	MediaAPI.prototype._handleRefer = function(event) {
+		var data = event.data;
+		if (data.originator !== 'remote') {
+			return;
+		}
+
+		// Check the refer had a known target session
+		var referredSession = data.session;
+		if (!referredSession) {
+			data.refer.reject({
+				status_code: 403,
+				reason_phrase: 'Missing Target-Session Header'
+			});
+			return;
+		}
+
+		// Check that the refer is to a SIP URI
+		if (data.refer.refer_uri.scheme !== JsSIP.C.SIP) {
+			data.refer.reject({
+				status_code: 416,
+				reason_phrase: 'Unsupported Refer URI Scheme'
+			});
+		}
+
+		// Find the target session
+		var mediaSessions = this.mediaSessions;
+		var mediaSession = null;
+		for (var idx = 0, len = mediaSessions.length; idx < len; idx++) {
+			mediaSession = mediaSessions[idx];
+			if (mediaSession.sipSession === referredSession) {
+				mediaSession._handleRefer(data.refer);
+				return;
+			}
+		}
+
+		// Could not find the target session
+		data.refer.reject({
+			status_code: 481,
+			reason_phrase: 'Target Session Does Not Exist'
+		});
 	};
 
 	/*
@@ -159,7 +214,7 @@
 	 * @throws {CrocSDK.Exceptions#VersionError}
 	 * @throws {CrocSDK.Exceptions#StateError}
 	 */
-	CrocSDK.MediaAPI.prototype.connect = function(address, connectConfig) {
+	MediaAPI.prototype.connect = function(address, connectConfig) {
 		var crocObject = this.crocObject;
 		var capabilityApi = crocObject.capability;
 		var sipSession = new JsSIP.RTCSession(crocObject.sipUA);
@@ -204,7 +259,7 @@
 	/**
 	 * Closes all current media sessions.
 	 */
-	CrocSDK.MediaAPI.prototype.close = function() {
+	MediaAPI.prototype.close = function() {
 		for ( var i = 0, len = this.mediaSessions.length; i < len; i++) {
 			this.mediaSessions[i].close();
 		}
@@ -215,7 +270,6 @@
 	// Documented Type Definitions
 
 	/**
-	 * @memberof CrocSDK.MediaAPI
 	 * @typedef CrocSDK.MediaAPI~ConnectConfig
 	 * @property {CrocSDK~CustomHeaders} customHeaders
 	 * Custom headers that to include in the session creation request.
@@ -231,7 +285,6 @@
 	 */
 
 	/**
-	 * @memberof CrocSDK.MediaAPI
 	 * @typedef CrocSDK.MediaAPI~StreamConfig
 	 * @property {CrocSDK.MediaAPI~StreamDirections} audio The audio stream
 	 * configuration. Set to <code>null</code> if there is no audio stream in
@@ -242,7 +295,6 @@
 	 */
 
 	/**
-	 * @memberof CrocSDK.MediaAPI
 	 * @typedef CrocSDK.MediaAPI~StreamDirections
 	 * @property {Boolean} send Set to <code>true</code> if the stream is
 	 *           outbound-only or bi-directional.
@@ -251,7 +303,6 @@
 	 */
 
 	/**
-	 * @memberof CrocSDK.MediaAPI
 	 * @typedef CrocSDK.MediaAPI~MediaSessionEvent
 	 * @property {CrocSDK.MediaAPI~MediaSession} session
 	 * The MediaSession object representing the inbound session.
@@ -271,10 +322,10 @@
 	 * If this event is not handled the Crocodile RTC JavaScript Library will
 	 * automatically reject inbound sessions.
 	 * 
-	 * @memberof CrocSDK.MediaAPI
 	 * @event CrocSDK.MediaAPI#onMediaSession
 	 * @param {CrocSDK.MediaAPI~MediaSessionEvent}
 	 * [event] The event object associated with this event.
 	 */
 
+	CrocSDK.MediaAPI = MediaAPI;
 }(CrocSDK));

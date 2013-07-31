@@ -224,6 +224,7 @@
 		this.localHold = false;
 		this.localHoldStreams = null;
 		this.dtmfSender = null;
+		this.transferFeedback = null;
 
 		// Public properties
 		/**
@@ -869,6 +870,17 @@
 		}
 	};
 
+	/**
+	 * Handles out-of-dialog "newRefer" events from JsSIP that targetted this
+	 * session.
+	 * @private
+	 * @param {JsSIP.Refer} refer - The object representing the incoming refer.
+	 */
+	MediaSession.prototype._handleRefer = function(refer) {
+		var event = new TransferRequestEvent(this, refer);
+		CrocSDK.Util.fireEvent(this, 'onTransferRequest', event, true);
+	};
+
 	/*
 	 * Public methods
 	 */
@@ -1157,6 +1169,52 @@
 	};
 
 	/**
+	 * Request that the remote party be transferred to the target address.
+	 * <p>
+	 * To ensure a standard call transfer experience, the following behaviour
+	 * is recommended for applications using this functionality:
+	 * <ol>
+	 * <li>Put the session on hold.
+	 * <li>Request the transfer.
+	 * <li>If the transfer is successful, close the session; otherwise resume
+	 * the session.
+	 * </ol>
+	 * 
+	 * @param {String} address - The target address of the transfer.
+	 * @returns {CrocSDK.MediaAPI~MediaSession~TransferFeedback}
+	 * @throws {CrocSDK.Exceptions#StateError}
+	 * If the current session is not established, or a previous transfer attempt
+	 * is still in progress.
+	 * @throws {CrocSDK.Exceptions#UnsupportedError}
+	 * If the remote party does not support transfer.
+	 */
+	MediaSession.prototype.transfer = function(address) {
+		if (this.state !== mediaSessionState.ESTABLISHED) {
+			throw new CrocSDK.Exceptions.StateError(
+					'Media session not established: ' + this.state);
+		}
+		if (this.transferFeedback) {
+			throw new CrocSDK.Exceptions.StateError(
+					'Previous transfer outstanding');
+		}
+
+		var feedback = new TransferFeedback(this);
+		var options = {};
+		options.eventHandlers = feedback._getJsSipHandlers();
+
+		try {
+			this.sipSession.sendRefer(address, options);
+		} catch (e) {
+			if (e instanceof JsSIP.Exceptions.RemoteSupportError) {
+				throw new CrocSDK.Exceptions.UnsupportedError(
+						'Remote party does not support transfers');
+			}
+		}
+		this.transferFeedback = feedback;
+		return feedback;
+	};
+
+	/**
 	 * Explicitly close this media session.
 	 * <p>
 	 * If <code>accept()</code> has not been called the session will be
@@ -1300,6 +1358,25 @@
 	};
 
 	/**
+	 * This event is fired when a request to transfer the session is received.
+	 * The web-app is responsible for notifying the user and requesting
+	 * permission to transfer (if appropriate), and then should call the
+	 * <code>accept</code> or <code>reject</code> method on the event object.
+	 * <p>
+	 * If this event is not handled, or the response is not provided within the
+	 * configured <code>acceptTimeout</code> period, the transfer request will
+	 * be rejected automatically.
+	 * 
+	 * @event
+	 * @param {CrocSDK.MediaAPI~MediaSession~TransferRequestEvent} event
+	 * The event object associated with this event.
+	 */
+	MediaSession.prototype.onTransferRequest = function(event) {
+		// Default handler rejects the request
+		event.reject();
+	};
+
+	/**
 	 * Dispatched when Crocodile RTC JavaScript Library detects that a 
 	 * {@link CrocSDK.MediaAPI~MediaSession MediaSession} 
 	 * has been closed by the Crocodile RTC Network or remote party.
@@ -1316,6 +1393,123 @@
 	 */
 	MediaSession.prototype.onClose = function() {
 		// Do nothing
+	};
+
+
+	/**
+	 * Provides feedback for an outgoing transfer/refer attempt.
+	 *  
+	 * @constructor
+	 * @alias CrocSDK.MediaAPI~MediaSession~TransferFeedback
+	 * @param {CrocSDK.MediaAPI~MediaSession} session
+	 * The target session being transferred.
+	 */
+	var TransferFeedback = function(session) {
+		this.session = session;
+	};
+
+	/**
+	 * Event fired when the remote party accepts a transfer request.
+	 * @event
+	 */
+	TransferFeedback.prototype.onAccepted = function () {
+		// Default behaviour is to close the session automatically (blind transfer)
+		this.session.close();
+	};
+
+	/**
+	 * Event fired when the remote party rejects a transfer request.
+	 * @event
+	 */
+	TransferFeedback.prototype.onRejected = function () {
+		// Default behaviour is to close the session automatically (blind transfer)
+		this.session.close();
+	};
+
+	TransferFeedback.prototype._getJsSipHandlers = function () {
+		var self = this;
+		return {
+			accepted: function() {
+				CrocSDK.Util.fireEvent(self, 'onAccepted', {}, true);
+			},
+			failed: function() {
+				// Transfer attempt finished
+				self.session.transferFeedback = null;
+				CrocSDK.Util.fireEvent(self, 'onRejected', {}, true);
+			}
+		};
+	};
+
+	/**
+	 * The event object for the
+	 * {@link CrocSDK.MediaAPI~MediaSession#event:onTransferRequest onTransferRequest}
+	 * event.
+	 * @constructor
+	 * @alias CrocSDK.MediaAPI~MediaSession~TransferRequestEvent
+	 * @param {CrocSDK.MediaAPI~MediaSession} session
+	 * @param {JsSIP.Refer} refer
+	 */
+	var TransferRequestEvent = function(session, refer) {
+		var self = this;
+
+		this.session = session;
+		this.refer = refer;
+		this.timer = setTimeout(function() {
+			self.reject();
+			self.timer = null;
+		}, session.mediaApi.acceptTimeout * 1000);
+
+		/**
+		 * The <code>address</code> to which we are being transferred.
+		 * @type {String}
+		 */
+		this.address = refer.refer_uri.toString().replace(/^sip:/, '');
+	};
+
+	/**
+	 * Accept the incoming transfer request. Returns a new
+	 * <code>MediaSession</code> object representing the media session with
+	 * the transfer target.
+	 * <p>
+	 * The stream configuration of the new MediaSession will match that of the
+	 * existing session unless it is specified in the <code>config</code>
+	 * parameter.
+	 * 
+	 * @param {CrocSDK.MediaAPI~ConnectConfig} [config]
+	 * Optional session configuration.
+	 * @returns {CrocSDK.MediaAPI~MediaSession} The new session with the
+	 * transfer target.
+	 */
+	TransferRequestEvent.prototype.accept = function(config) {
+		if (this.timer === null) {
+			return;
+		}
+		clearTimeout(this.timer);
+		this.timer = null;
+
+		config = config || {};
+		if (!config.streamConfig) {
+			config.streamConfig = this.session.streamConfig;
+		} 
+
+		var newSession = this.session.mediaApi.connect(this.address, config);
+		// TODO: Add handlers that send appropriate NOTIFY messages
+		return newSession;
+	};
+
+	/**
+	 * Reject the incoming transfer request.
+	 */
+	TransferRequestEvent.prototype.reject = function() {
+		if (this.timer === null) {
+			return;
+		}
+		clearTimeout(this.timer);
+		this.timer = null;
+
+		this.refer.reject({
+			status_code: 603
+		});
 	};
 
 
@@ -1382,23 +1576,6 @@
 
 	/**
 	 * @memberof CrocSDK.MediaAPI~MediaSession
-	 * @typedef CrocSDK.MediaAPI~MediaSession~TransferRequestEvent
-	 * @property {String} transferAddress The <code>address</code> to which we
-	 *           are being transferred.
-	 */
-
-	/**
-	 * @memberof CrocSDK.MediaAPI~MediaSession
-	 * @typedef CrocSDK.MediaAPI~MediaSession~TransferProgressEvent
-	 * @property {Boolean} transferComplete Set to <code>true</code> if the
-	 *           transfer process has finished.
-	 * @property {Boolean} transferSuccessful Set to <code>true</code> if the
-	 *           transfer process has finished successfully. <code>false</code>
-	 *           indicates the transfer is pending or has failed.
-	 */
-
-	/**
-	 * @memberof CrocSDK.MediaAPI~MediaSession
 	 * @typedef CrocSDK.MediaAPI~MediaSession~CloseEvent
 	 * @property {String} status An indication of how the session ended.
 	 * 
@@ -1413,24 +1590,6 @@
 	 * <li><code>notfound</code> - the remote party does not exist or wants
 	 * to appear to not exist.</li>
 	 * </ul>
-	 */
-
-	// Documented Methods (functions)
-
-	/**
-	 * Put the session on-hold (if not already) and perform a blind-transfer to
-	 * transfer the remote party to <code>address</code>.
-	 * <p>
-	 * Notification of the transfer result will be provided through the
-	 * {@link CrocSDK.MediaAPI~MediaSession#event:onTransferProgress OnTransferProgress}
-	 * event.
-	 * 
-	 * @memberof CrocSDK.MediaAPI~MediaSession
-	 * @function CrocSDK.MediaAPI~MediaSession#blindTransfer
-	 * @param {String} address
-	 * @throws {TypeError}
-	 * @throws {CrocSDK.Exceptions#ValueError}
-	 * @throws {CrocSDK.Exceptions#StateError}
 	 */
 
 	// Documented Events
@@ -1487,35 +1646,6 @@
 	 * 
 	 * @memberof CrocSDK.MediaAPI~MediaSession
 	 * @event CrocSDK.MediaAPI~MediaSession#onRenegotiateComplete
-	 */
-
-	/**
-	 * This event is dispatched when a request to transfer the session is
-	 * received. The web-app must call the <code>acceptTransfer()</code> or
-	 * <code>rejectTransfer()</code> method as appropriate.
-	 * <p>
-	 * If this event is not handled the transfer request will be rejected
-	 * automatically.
-	 * 
-	 * @memberof CrocSDK.MediaAPI~MediaSession
-	 * @event CrocSDK.MediaAPI~MediaSession#onTransferRequest
-	 * @param {CrocSDK.MediaAPI~MediaSession~TransferRequestEvent}
-	 * [event] The event object associated with this event.
-	 */
-
-	/**
-	 * This event is dispatched when a progress indication is received for a
-	 * transfer that has been requested by this party. Regardless of the result
-	 * the current session remains valid (but on-hold) and should be closed once
-	 * it is no longer required.
-	 * <p>
-	 * If this handler is not defined the media session will be automatically
-	 * closed after the local party sends a transfer request.
-	 * 
-	 * @memberof CrocSDK.MediaAPI~MediaSession
-	 * @event CrocSDK.MediaAPI~MediaSession#onTransferProgress
-	 * @param {CrocSDK.MediaAPI~MediaSession~TransferProgressEvent}
-	 * [event] The event object associated with this event.
 	 */
 
 	CrocSDK.MediaSession = MediaSession;
