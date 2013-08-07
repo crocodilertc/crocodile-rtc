@@ -1410,6 +1410,9 @@
 
 	/**
 	 * Event fired when the remote party accepts a transfer request.
+	 * <p>
+	 * If this event is not handled, the default behaviour is to close the
+	 * session.
 	 * @event
 	 */
 	TransferFeedback.prototype.onAccepted = function () {
@@ -1419,6 +1422,9 @@
 
 	/**
 	 * Event fired when the remote party rejects a transfer request.
+	 * <p>
+	 * If this event is not handled, the default behaviour is to close the
+	 * session.
 	 * @event
 	 */
 	TransferFeedback.prototype.onRejected = function () {
@@ -1426,6 +1432,34 @@
 		this.session.close();
 	};
 
+	/**
+	 * Event fired when the transfer has completed successfully.
+	 * <p>
+	 * If this event is not handled, no special action is taken.
+	 * @event CrocSDK.MediaAPI~MediaSession~TransferFeedback#onTransferSucceeded
+	 */
+
+	/**
+	 * Event fired when the transfer attempt has failed.
+	 * <p>
+	 * If this event is not handled, no special action is taken.
+	 * @event CrocSDK.MediaAPI~MediaSession~TransferFeedback#onTransferFailed
+	 */
+
+	/**
+	 * Event fired when the result of the transfer attempt cannot be determined.
+	 * <p>
+	 * This may occur if the remote client does not support reporting of
+	 * transfer progress, or if the result fails to reach us for some reason.
+	 * <p>
+	 * If this event is not handled, no special action is taken.
+	 * @event CrocSDK.MediaAPI~MediaSession~TransferFeedback#onTransferResultUnknown
+	 */
+
+	/**
+	 * @private
+	 * @returns {Object} JsSIP event handlers for a Refer object
+	 */
 	TransferFeedback.prototype._getJsSipHandlers = function () {
 		var self = this;
 		return {
@@ -1436,6 +1470,26 @@
 				// Transfer attempt finished
 				self.session.transferFeedback = null;
 				CrocSDK.Util.fireEvent(self, 'onRejected', {}, true);
+			},
+			notify: function(event) {
+				var data = event.data;
+				if (!data.finalNotify) {
+					return;
+				}
+
+				// Transfer attempt finished
+				self.session.transferFeedback = null;
+				switch (data.sessionEvent) {
+				case 'started':
+					CrocSDK.Util.fireEvent(self, 'onTransferSucceeded', {});
+					break;
+				case 'failed':
+					CrocSDK.Util.fireEvent(self, 'onTransferFailed', {});
+					break;
+				default:
+					CrocSDK.Util.fireEvent(self, 'onTransferResultUnknown', {});
+					break;
+				}
 			}
 		};
 	};
@@ -1493,7 +1547,7 @@
 		} 
 
 		var newSession = this.session.mediaApi.connect(this.address, config);
-		// TODO: Add handlers that send appropriate NOTIFY messages
+		this.refer.addSessionNotifyHandlers(newSession.sipSession);
 		return newSession;
 	};
 
