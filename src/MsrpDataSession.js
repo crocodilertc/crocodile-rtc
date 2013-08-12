@@ -293,7 +293,7 @@
 	 * 
 	 * <p>
 	 * Instances of this object are contained within the
-	 * {@link CrocSDK.MsrpDataSession~TransferProgress~OnDataStartEvent OnDataStartEvent}
+	 * {@link CrocSDK.MsrpDataSession~TransferProgress~DataStartEvent DataStartEvent}
 	 * object provided as an argument to the
 	 * {@link CrocSDK.MsrpDataSession#event:onDataStart DataSession.onDataStart}
 	 * event handler.
@@ -419,8 +419,8 @@
 	 * 
 	 * @memberof CrocSDK.MsrpDataSession~TransferProgress
 	 * @event CrocSDK.MsrpDataSession~TransferProgress#onSuccess
-	 * @param {CrocSDK.MsrpDataSession~TransferProgress~OnSuccessEvent}
-	 *            [OnSuccessEvent] The event object assocated with this event.
+	 * @param {CrocSDK.MsrpDataSession~TransferProgress~SuccessEvent} event
+	 * The event object associated with this event.
 	 */
 	TransferProgress.prototype.onSuccess = function() {
 		// Do nothing
@@ -438,8 +438,8 @@
 	 * 
 	 * @memberof CrocSDK.MsrpDataSession~TransferProgress
 	 * @event CrocSDK.MsrpDataSession~TransferProgress#onFailure
-	 * @param {CrocSDK.MsrpDataSession~TransferProgress~OnFailureEvent}
-	 *            [OnFailureEvent] The event object assocated with this event.
+	 * @param {CrocSDK.MsrpDataSession~TransferProgress~FailureEvent} event
+	 * The event object associated with this event.
 	 */
 	TransferProgress.prototype.onFailure = function() {
 		// Do nothing
@@ -456,8 +456,8 @@
 	 * 
 	 * @memberof CrocSDK.MsrpDataSession~TransferProgress
 	 * @event CrocSDK.MsrpDataSession~TransferProgress#onProgress
-	 * @param {CrocSDK.MsrpDataSession~TransferProgress~OnProgressEvent}
-	 *            [OnProgressEvent] The event object assocated with this event.
+	 * @param {CrocSDK.MsrpDataSession~TransferProgress~ProgressEvent} event
+	 * The event object associated with this event.
 	 */
 	TransferProgress.prototype.onProgress = function() {
 		// Do nothing
@@ -480,7 +480,7 @@
 	 * <p>
 	 * Instances of this object are provided as the return value of the
 	 * {@link CrocSDK.DataAPI#send Data.send()} method and are also contained
-	 * within the {@link CrocSDK.DataAPI~OnDataSessionEvent OnDataSessionEvent}
+	 * within the {@link CrocSDK.DataAPI~DataSessionEvent DataSessionEvent}
 	 * object provided as an argument to the
 	 * {@link CrocSDK.DataAPI#event:onDataSession Data.onDataSession} event handler.
 	 * </p>
@@ -506,7 +506,7 @@
 	 *     var crocObject = $.croc({
 	 *       apiKey: "API_KEY_GOES_HERE",
 	 *       onConnected: function () {
-	 *         this.data.send('sip:bob@example.com', 'Web application ready');
+	 *         this.data.send('bob@example.com', 'Web application ready');
 	 *       },
 	 *       
 	 *       data: {
@@ -546,16 +546,16 @@
 	 * 
 	 * @private
 	 * @function CrocSDK.MsrpDataSession#init
-	 * @param {CrocSDK.DataAPI}
-	 *            dataApi an Instance of a {@link CrocSDK.DataAPI DataAPI}
-	 *            class.
-	 * @param {String}
-	 *            address The address of the user to establish a session with.
+	 * @param {CrocSDK.DataAPI} dataApi
+	 * The parent DataAPI instance.
+	 * @param {JsSIP.URI} uri
+	 * The address of the user to establish a session with.
 	 */
-	MsrpDataSession.prototype.init = function(dataApi, address) {
+	MsrpDataSession.prototype.init = function(dataApi, uri) {
 		var self = this;
 		// Internal state
 		this.dataApi = dataApi;
+		this.uri = uri;
 		this.sipSession = null;
 		this.msrpSession = null;
 		this.state = CrocSDK.C.states.dataSession.PENDING;
@@ -586,7 +586,7 @@
 		 * @instance
 		 * @type {String}
 		 */
-		this.address = address;
+		this.address = uri.toAor().replace(/^sip:/, '');
 		/**
 		 * The display name of the remote party.
 		 * 
@@ -941,7 +941,7 @@
 	 * {@link CrocSDK.DataAPI#event:onData Data.onData()} handler.
 	 * 
 	 * @event CrocSDK.MsrpDataSession#onData
-	 * @param {CrocSDK.DataAPI~OnDataEvent} event - The event object assocated
+	 * @param {CrocSDK.DataAPI~DataEvent} event - The event object assocated
 	 * with this event.
 	 */
 	MsrpDataSession.prototype.onData = function(event) {
@@ -958,7 +958,7 @@
 	 * If this event is not handled the received data will be discarded.
 	 * 
 	 * @event CrocSDK.MsrpDataSession#onXHTMLReceived
-	 * @param {CrocSDK.DataAPI~OnXHTMLReceivedEvent} event - The event object
+	 * @param {CrocSDK.DataAPI~XHTMLReceivedEvent} event - The event object
 	 * associated with this event.
 	 */
 	MsrpDataSession.prototype.onXHTMLReceived = function(event) {
@@ -970,7 +970,7 @@
 	 * Dispatched whenever the composing state of the remote party changes.
 	 * 
 	 * @event CrocSDK.MsrpDataSession#onComposingStateChange
-	 * @param {CrocSDK.MsrpDataSession~OnComposingStateChangeEvent} event - The
+	 * @param {CrocSDK.MsrpDataSession~ComposingStateChangeEvent} event - The
 	 * event object associated with this event.
 	 */
 
@@ -994,7 +994,7 @@
 	 * </p>
 	 * 
 	 * @event CrocSDK.MsrpDataSession#onDataStart
-	 * @param {CrocSDK.MsrpDataSession~OnDataStartEvent} event - The event object
+	 * @param {CrocSDK.MsrpDataSession~DataStartEvent} event - The event object
 	 * assocated with this event.
 	 */
 	MsrpDataSession.prototype.onDataStart = function() {
@@ -1003,14 +1003,14 @@
 
 	/**
 	 * @event CrocSDK.MsrpDataSession#onClose
-	 * @param {CrocSDK.MediaAPI~MediaSession~OnCloseEvent} event - The event object
+	 * @param {CrocSDK.MediaAPI~MediaSession~CloseEvent} event - The event object
 	 * assocated with this event. 
 	 * */
 	MsrpDataSession.prototype.onClose = function() {
 		// Do nothing
 	};
 
-	CrocSDK.OutgoingMsrpSession = function(dataApi, address, data, sendConfig) {
+	CrocSDK.OutgoingMsrpSession = function(dataApi, uri, data, sendConfig) {
 		var msrpCon = getNextMsrpConnection(dataApi);
 		var eventObj = {};
 		var mimetype = sendConfig.contentType || data.type;
@@ -1018,14 +1018,14 @@
 		var crocObject = dataApi.crocObject;
 		var capabilityApi = crocObject.capability;
 
-		this.init(dataApi, address);
+		this.init(dataApi, uri);
 		if (sendConfig.customHeaders instanceof CrocSDK.CustomHeaders) {
 			this.customHeaders = sendConfig.customHeaders;
 		} else {
 			this.customHeaders = new CrocSDK.CustomHeaders(sendConfig.customHeaders);
 		}
 		// Start with cached capabilities if we have them
-		this.capabilities = capabilityApi.getCapabilities(address);
+		this.capabilities = capabilityApi.getCapabilities(uri);
 
 		if (!mimetype) {
 			if (CrocSDK.Util.isType(data, 'string')) {
@@ -1075,7 +1075,7 @@
 			};
 
 			dataSession.sipSession = new JsSIP.RTCSession(crocObject.sipUA);
-			dataSession.sipSession.connect('sip:' + address, sipOptions);
+			dataSession.sipSession.connect(uri, sipOptions);
 		};
 
 		addSharedMsrpEvents(dataSession, eventObj);
@@ -1106,7 +1106,7 @@
 		var dataSession = this;
 		var capabilityApi = dataApi.crocObject.capability;
 
-		this.init(dataApi, sipSession.remote_identity.uri.toAor().replace(/^sip:/, ''));
+		this.init(dataApi, sipSession.remote_identity.uri);
 		this.sipSession = sipSession;
 		this.displayName = sipSession.remote_identity.display_name;
 		this.customHeaders = new CrocSDK.CustomHeaders(sipRequest);
@@ -1186,7 +1186,7 @@
 	// Type Definitions
 	/**
 	 * @memberof CrocSDK.MsrpDataSession~TransferProgress
-	 * @typedef CrocSDK.MsrpDataSession~TransferProgress~OnDataStartEvent
+	 * @typedef CrocSDK.MsrpDataSession~TransferProgress~DataStartEvent
 	 * @property {CrocSDK.MsrpDataSession~TransferProgress} transferprogress 
 	 * The {@link CrocSDK.MsrpDataSession~TransferProgress TransferProgress} 
 	 * object instance that may be used to monitor and control the data 
@@ -1194,7 +1194,7 @@
 	 */
 	/**
 	 * @memberof CrocSDK.MsrpDataSession~TransferProgress
-	 * @typedef CrocSDK.MsrpDataSession~TransferProgress~OnFailureEvent
+	 * @typedef CrocSDK.MsrpDataSession~TransferProgress~FailureEvent
 	 * @property {ArrayBuffer|Blob|String} partialData The data received up to 
 	 * the abort/failure. Text data will be presented as String. Binary data 
 	 * will be presented as ArrayBuffer or Blob, depending on the expected size
@@ -1202,14 +1202,14 @@
 	 */
 	/**
 	 * @memberof CrocSDK.MsrpDataSession~TransferProgress
-	 * @typedef CrocSDK.MsrpDataSession~TransferProgress~OnProgressEvent
+	 * @typedef CrocSDK.MsrpDataSession~TransferProgress~ProgressEvent
 	 * @property {Number} bytesComplete The number of bytes transfered so far.
 	 * @property {Number} percentComplete The percentage of the data transfered
 	 * so far. Set to null if the total size of the data is not known. 
 	 */
 	/**
 	 * @memberof CrocSDK.MsrpDataSession~TransferProgress
-	 * @typedef CrocSDK.MsrpDataSession~TransferProgress~OnSuccessEvent
+	 * @typedef CrocSDK.MsrpDataSession~TransferProgress~SuccessEvent
 	 * @property {ArrayBuffer|Blob|String} data The received <code>data</code>.
 	 * Text data will be presented as String. Binary data will be presented as 
 	 * ArrayBuffer or Blob, depending on the size of the data.

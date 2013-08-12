@@ -22,9 +22,10 @@
 			session.customHeaders = new CrocSDK.CustomHeaders(sendConfig.customHeaders);
 
 			if (!dataApi.checkSessionsIntervalId) {
-				dataApi.checkSessionsIntervalId = window.setInterval(function() {
-					checkSessions(dataApi);
-				}, 10000);
+				dataApi.checkSessionsIntervalId = window.setInterval(
+						function() {
+							checkSessions(dataApi);
+						}, 10000);
 			}
 
 			dataApi.sipDataSessions[address] = session;
@@ -45,9 +46,13 @@
 	 * @returns {CrocSDK.MsrpDataSession}
 	 */
 	function msrpSend(dataApi, address, data, sendConfig) {
+		var uri = CrocSDK.Util.normaliseAddress(address);
+		var bareAddress = uri.toAor().replace(/^sip:/, '');
 		var session = null;
+
 		// Check for suitable existing sessions to reuse
-		if (!sendConfig.customHeaders && !sendConfig.fileTransfer) {
+		if (!sendConfig.customHeaders && !sendConfig.fileTransfer &&
+				address === bareAddress) {
 			session = dataApi.reusableMsrpDataSessions[address];
 		}
 
@@ -55,15 +60,17 @@
 			session.send(data, sendConfig);
 		} else {
 			// No sessions suitable - create a new one
-			session = new CrocSDK.OutgoingMsrpSession(dataApi, address, data, sendConfig);
+			session = new CrocSDK.OutgoingMsrpSession(dataApi, uri, data, sendConfig);
 
 			if (!dataApi.checkSessionsIntervalId) {
-				dataApi.checkSessionsIntervalId = window.setInterval(function() {
-					checkSessions(dataApi);
-				}, 10000);
+				dataApi.checkSessionsIntervalId = window.setInterval(
+						function() {
+							checkSessions(dataApi);
+						}, 10000);
 			}
 
-			if (!sendConfig.customHeaders && !sendConfig.fileTransfer) {
+			if (!sendConfig.customHeaders && !sendConfig.fileTransfer &&
+					address === bareAddress) {
 				dataApi.reusableMsrpDataSessions[address] = session;
 			}
 			dataApi.msrpDataSessions.push(session);
@@ -109,9 +116,10 @@
 			dataApi.xmppDataSessions[address] = dataSession;
 
 			if (!dataApi.checkSessionsIntervalId) {
-				dataApi.checkSessionsIntervalId = window.setInterval(function() {
-					checkSessions(dataApi);
-				}, 10000);
+				dataApi.checkSessionsIntervalId = window.setInterval(
+						function() {
+							checkSessions(dataApi);
+						}, 10000);
 			}
 		}
 
@@ -483,18 +491,18 @@
 	 * @returns {boolean} 'true' to prevent bubbling of the event
 	 */
 	CrocSDK.DataAPI.prototype._handleXmppMessage = function (message) {
-		var uniqueAddress = message.getFrom();
+		var instanceAddress = message.getFrom();
 		var address = message.getFromJID().getBareJID();
 		var dataSession = this.xmppDataSessions[address];
 
 		if (dataSession && dataSession.getState() !== 'closed') {
 			// Existing data session
 			// "Lock in" on full JID (see RFC 6121 section 5.1)
-			dataSession._setUniqueAddress(uniqueAddress);
+			dataSession._setInstanceAddress(instanceAddress);
 		} else {
 			// Create a new data session
 			dataSession = new CrocSDK.XmppDataSession(this, address);
-			dataSession._setUniqueAddress(uniqueAddress);
+			dataSession._setInstanceAddress(instanceAddress);
 			this.xmppDataSessions[address] = dataSession;
 
 			if (!this.checkSessionsIntervalId) {
@@ -547,14 +555,18 @@
 	 * to let the SDK handle session management.
 	 * 
 	 * @memberof CrocSDK.DataAPI
-	 * @param {String}
-	 *            address the address to send the message to.
-	 * @param {ArrayBuffer|Blob|File|String}
-	 *            data the body of the message.
-	 * @param {CrocSDK.DataAPI~SendConfig}
-	 *            [sendConfig] Optional extra information that can be provided
-	 *            when sending data. If this object is omitted, the defaults
-	 *            will be used.
+	 * @param {String|JsSIP.URI} address
+	 * The target address for this data.
+	 * <p>
+	 * A client instance's unique address may be used if you wish to target only
+	 * that instance, but this is an advanced feature: it is only designed to
+	 * work for MSRP data sessions, and relies on the application to handle
+	 * session management.
+	 * @param {ArrayBuffer|Blob|File|String} data
+	 * The data to send.  This can be string/binary data, or an entire file.
+	 * @param {CrocSDK.DataAPI~SendConfig} [sendConfig]
+	 * Optional extra configuration that can be provided when sending data. If
+	 * this object is omitted, the defaults will be used.
 	 * @returns {CrocSDK.MsrpDataSession} DataSession
 	 * @throws {TypeError}
 	 * @throws {CrocSDK.Exceptions#ValueError}
@@ -679,7 +691,7 @@
 	 * 
 	 * @memberof CrocSDK.DataAPI
 	 * @event CrocSDK.DataAPI#onDataSession
-	 * @param {CrocSDK.DataAPI~OnDataSessionEvent}
+	 * @param {CrocSDK.DataAPI~DataSessionEvent}
 	 *            [onDataSessionEvent] The event object assocated with this
 	 *            event.
 	 */
@@ -706,7 +718,7 @@
 	 * 
 	 * @memberof CrocSDK.DataAPI
 	 * @event CrocSDK.DataAPI#onData
-	 * @param {CrocSDK.DataAPI~OnDataEvent}
+	 * @param {CrocSDK.DataAPI~DataEvent}
 	 *            [event] The event object assocated with this event.
 	 */
 	CrocSDK.DataAPI.prototype.onData = function() {
@@ -725,7 +737,7 @@
 	 * 
 	 * @memberof CrocSDK.DataAPI
 	 * @event CrocSDK.DataAPI#onXHTMLReceived
-	 * @param {CrocSDK.DataAPI~OnXHTMLReceivedEvent} [event] The event object
+	 * @param {CrocSDK.DataAPI~XHTMLReceivedEvent} [event] The event object
 	 * assocated with this event.
 	 */
 
@@ -835,7 +847,7 @@
 
 	/**
 	 * @memberof CrocSDK.DataAPI
-	 * @typedef CrocSDK.DataAPI~OnDataEvent
+	 * @typedef CrocSDK.DataAPI~DataEvent
 	 * @property {String} address The address of the user that sent the data.
 	 * @property {String} contentType The MIME type of the data.
 	 * @property {ArrayBuffer|Blob|String} data The received data. Text data
@@ -845,7 +857,7 @@
 
 	/**
 	 * @memberof CrocSDK.DataAPI
-	 * @typedef CrocSDK.DataAPI~OnXHTMLReceivedEvent
+	 * @typedef CrocSDK.DataAPI~XHTMLReceivedEvent
 	 * @property {String} address The address of the user that sent the data.
 	 * @property {DocumentFragment} body - The received body.
 	 * @see http://www.w3.org/TR/DOM-Level-2-Core/core.html#ID-B63ED1A3
@@ -853,7 +865,7 @@
 
 	/**
 	 * @memberof CrocSDK.DataAPI
-	 * @typedef CrocSDK.DataAPI~OnDataSessionEvent
+	 * @typedef CrocSDK.DataAPI~DataSessionEvent
 	 * @property {CrocSDK.MsrpDataSession} session The DataSession
 	 *           representing the inbound session.
 	 * @property {CrocSDK.DataAPI~FileTransferInfo} fileTransfer Details of the
@@ -874,4 +886,5 @@
 	 * @property {String} disposition The disposition of the file.
 	 * @property {Number} size The size of the file (in bytes).
 	 */
+
 }(CrocSDK));

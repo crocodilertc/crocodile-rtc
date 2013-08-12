@@ -278,7 +278,7 @@
 	 * the
 	 * {@link CrocSDK.MediaAPI~MediaSession#customHeaders MediaSession.customHeaders}
 	 * property and to the remote party in the
-	 * {@link CrocSDK.MediaAPI~MediaSession~OnRenegotiateRequestEvent OnRenegotiateRequestEvent.customHeaders}
+	 * {@link CrocSDK.MediaAPI~MediaSession~RenegotiateRequestEvent RenegotiateRequestEvent.customHeaders}
 	 * property during session renegotiation.
 	 * @property {CrocSDK.MediaAPI~StreamConfig} streamConfig The media stream
 	 *           configuration.

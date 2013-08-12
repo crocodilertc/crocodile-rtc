@@ -22,6 +22,7 @@
 		this.status = null;
 		this.capabilities = null;
 		this.userAgent = null;
+		this.instanceAddress = null;
 	}
 
 	/**
@@ -43,10 +44,9 @@
 		var status = "normal";
 		var responseCode = 200;
 		var contactHeader = 'Contact: ';
+		var customCapabilities = null;
 
-		contactHeader += crocObject.sipUA.contact.toString({
-			outbound : true
-		});
+		contactHeader += crocObject.sipUA.contact.toString();
 
 		// Fire onWatchRequest event, allow app to change status
 		CrocSDK.Util.fireEvent(capabilityApi, "onWatchRequest", {
@@ -67,13 +67,24 @@
 				} else {
 					throw new TypeError(setStatus + " is not set to a valid type");
 				}
+			},
+			setCapabilities: function(capabilities) {
+				customCapabilities = capabilities;
 			}
 		});
 
 		// Reply
 		switch (status) {
 		case "normal":
-			contactHeader += capabilityApi.createFeatureTags(crocObject.capabilities);
+			var caps;
+			if (customCapabilities) {
+				caps = {};
+				CrocSDK.Util.shallowCopy(caps, crocObject.capabilities);
+				CrocSDK.Util.shallowCopy(caps, customCapabilities);
+			} else {
+				caps = crocObject.capabilities;
+			}
+			contactHeader += capabilityApi.createFeatureTags(caps);
 			break;
 		case "blocked":
 			responseCode = 403;
@@ -100,7 +111,8 @@
 	 * @param watchData
 	 * @param {JsSIP.IncomingResponse}
 	 *            response An instance of a JsSIP.IncomingResponse class
-	 * @fires CrocSDK.CapabilityAPI#onWatchChange
+	 * @returns {Boolean} <code>true</code> if watchData has changed from the
+	 * last observed response.
 	 */
 	function processOptionsResponse(capabilityApi, watchData, response) {
 		var previousStatus = watchData.status;
@@ -127,6 +139,7 @@
 
 		if (response.hasHeader('contact')) {
 			var parsedContact = response.parseHeader('contact', 0);
+			watchData.instanceAddress = parsedContact.uri.toString();
 			watchData.capabilities = capabilityApi.parseFeatureTags(parsedContact.parameters);
 		}
 
@@ -149,15 +162,7 @@
 			}
 		}
 
-		if (fireEvent) {
-			var toAddress = response.parseHeader('to', 0).uri.toAor().replace(/^sip:/, '');
-
-			CrocSDK.Util.fireEvent(capabilityApi, "onWatchChange", {
-				address : toAddress,
-				status : watchData.status,
-				capabilities : watchData.capabilities
-			});
-		}
+		return fireEvent;
 	}
 
 	/**
@@ -200,27 +205,20 @@
 	}
 
 	/**
-	 * <p>
 	 * The capability features of the Crocodile RTC JavaScript Library allow a
 	 * web-app to query the capabilities of other instances connected to the
 	 * Crocodile RTC Network. This is useful for discovering the existence of,
 	 * status of, and features supported by other users of the Crocodile RTC
 	 * Network.
-	 * </p>
-	 * 
 	 * <p>
 	 * Once the {@link CrocSDK.Croc Croc} Object is instantiated it will contain
 	 * an instance of the {@link CrocSDK.CapabilityAPI Capability} object named
 	 * <code>capability</code>.
-	 * </p>
-	 * 
 	 * <p>
 	 * For example, given a {@link CrocSDK.Croc Croc} Object named
 	 * <code>crocObject</code> the <code>Capability.refreshPeriod</code>
 	 * property would be accessed as
 	 * <code>crocObject.capability.refreshPeriod</code>.
-	 * </p>
-	 * 
 	 * <p>
 	 * An example using the Capability API:
 	 *   <pre>
@@ -243,7 +241,6 @@
 	 *     });
 	 *   </code>
 	 *   </pre>
-	 * </p>
 	 * 
 	 * @constructor
 	 * @memberof CrocSDK
@@ -449,21 +446,20 @@
 	};
 
 	/**
-	 * <p>
 	 * Add <code>address</code> to the watch list. Crocodile RTC JavaScript
 	 * Library will periodically query the capabilities of each of the addresses
 	 * on the watch list. A capabilities query is sent automatically when a new
 	 * address is added to the list.
-	 * </p>
-	 * 
 	 * <p>
 	 * Exceptions: TypeError, {@link CrocSDK.Exceptions#ValueError ValueError}
-	 * </p>
 	 * 
 	 * @param {String}
 	 *            address The address to add to the watch List.
 	 */
 	CrocSDK.CapabilityAPI.prototype.watch = function(address) {
+		var uri = CrocSDK.Util.normaliseAddress(address);
+		address = uri.toAor().replace(/^sip:/, '');
+
 		if (!this.watchDataCache[address]) {
 			this.watchList.push(address);
 			this.watchDataCache[address] = new WatchData();
@@ -477,18 +473,17 @@
 	};
 
 	/**
-	 * <p>
 	 * Remove <code>address</code> from the watch list.
-	 * </p>
-	 * 
 	 * <p>
 	 * Exceptions: TypeError, {@link CrocSDK.Exceptions#ValueError ValueError}
-	 * </p>
 	 * 
 	 * @param {String}
 	 *            address The address to remove from the watch List.
 	 */
 	CrocSDK.CapabilityAPI.prototype.unwatch = function(address) {
+		var uri = CrocSDK.Util.normaliseAddress(address);
+		address = uri.toAor().replace(/^sip:/, '');
+
 		if (this.watchDataCache[address]) {
 			var index = this.watchList.indexOf(address);
 			this.watchList.splice(index, 1);
@@ -502,29 +497,35 @@
 	};
 
 	/**
-	 * <p>
 	 * Send an immediate query for the capabilities of <code>address</code>.
 	 * <code>address</code> must be on the watch list before calling this
 	 * method.
-	 * </p>
 	 * 
-	 * <p>
-	 * Exceptions: TypeError, {@link CrocSDK.Exceptions#ValueError ValueError}
-	 * </p>
-	 * 
-	 * @param {String}
-	 *            address The address to refresh in the watch List.
+	 * @param {String} address The address to refresh in the watch List.
+	 * @throws {CrocSDK.Exceptions.ValueError} If the address is not on the
+	 * watch list.
 	 */
 	CrocSDK.CapabilityAPI.prototype.refresh = function(address) {
 		var capabilityApi = this;
+		var uri = CrocSDK.Util.normaliseAddress(address);
+		address = uri.toAor().replace(/^sip:/, '');
+
 		var watchData = this.watchDataCache[address];
 		if (!watchData) {
-			return null;
+			throw new CrocSDK.Exceptions.ValueError('Address not in watch list');
 		}
+
 		var applicant = {
-			request : new JsSIP.OutgoingRequest(JsSIP.C.OPTIONS, 'sip:' + address, this.crocObject.sipUA),
+			request : new JsSIP.OutgoingRequest(JsSIP.C.OPTIONS, uri, this.crocObject.sipUA),
 			receiveResponse : function(response) {
-				processOptionsResponse(capabilityApi, watchData, response);
+				if (processOptionsResponse(capabilityApi, watchData, response)) {
+					CrocSDK.Util.fireEvent(capabilityApi, "onWatchChange", {
+						address: address,
+						instanceAddress: watchData.instanceAddress,
+						status: watchData.status,
+						capabilities: watchData.capabilities
+					});
+				}
 			},
 			onRequestTimeout : function() {
 				console.log("request timeout");
@@ -540,24 +541,69 @@
 	};
 
 	/**
+	 * Send an immediate query for the capabilities of <code>address</code>.
+	 * This is a one-off query; <code>address</code> does not have to be on the
+	 * watch list before calling this method.
+	 * 
+	 * @param {String|JsSIP.URI} address
+	 * The address to query.
 	 * <p>
+	 * A client instance's unique address may be used if you wish to target only
+	 * that instance.
+	 * @param {Function} callback
+	 * The callback function to run when the result is received. The callback
+	 * function is passed an
+	 * {@link CrocSDK.CapabilityAPI~WatchChangeEvent WatchChangeEvent} object as
+	 * the first parameter.
+	 */
+	CrocSDK.CapabilityAPI.prototype.query = function(address, callback) {
+		var capabilityApi = this;
+		var watchData = new WatchData();
+		var uri = CrocSDK.Util.normaliseAddress(address);
+		address = uri.toAor().replace(/^sip:/, '');
+
+		var applicant = {
+			request : new JsSIP.OutgoingRequest(JsSIP.C.OPTIONS, uri, this.crocObject.sipUA),
+			receiveResponse : function(response) {
+				processOptionsResponse(capabilityApi, watchData, response);
+				callback({
+					address: address,
+					instanceAddress: watchData.instanceAddress,
+					status: watchData.status,
+					capabilities: watchData.capabilities
+				});
+			},
+			onRequestTimeout : function() {
+				console.log("request timeout");
+				callback(null);
+			},
+			onTransportError : function() {
+				console.warn("request transport error");
+				callback(null);
+			}
+		};
+
+		var requestSender = new JsSIP.RequestSender(applicant, this.crocObject.sipUA);
+		requestSender.send();
+	};
+
+	/**
 	 * Returns a Capabilities object containing the capabilities cached for
 	 * <code>address</code>. Returns <code>null</code> if
 	 * <code>address</code> is not on the watch list or if a capabilities
 	 * query response for <code>address</code> has not yet been received.
-	 * </p>
-	 * 
 	 * <p>
 	 * Exceptions: TypeError, {@link CrocSDK.Exceptions#ValueError ValueError}
-	 * </p>
 	 * 
 	 * @param {String}
 	 *            address The address to refresh in the watch List.
 	 * @returns {CrocSDK.Croc~Capabilities} Capabilities
 	 */
 	CrocSDK.CapabilityAPI.prototype.getCapabilities = function(address) {
-		var watchData = this.watchDataCache[address];
+		var uri = CrocSDK.Util.normaliseAddress(address);
+		address = uri.toAor().replace(/^sip:/, '');
 
+		var watchData = this.watchDataCache[address];
 		if (watchData) {
 			return watchData.capabilities;
 		}
@@ -577,8 +623,10 @@
 	 * @returns {CrocSDK.CapabilityAPI~status} watchStatus
 	 */
 	CrocSDK.CapabilityAPI.prototype.getWatchStatus = function(address) {
-		var watchData = this.watchDataCache[address];
+		var uri = CrocSDK.Util.normaliseAddress(address);
+		address = uri.toAor().replace(/^sip:/, '');
 
+		var watchData = this.watchDataCache[address];
 		if (watchData) {
 			return watchData.status;
 		}
@@ -597,25 +645,23 @@
 	 * @returns The cached watch data
 	 */
 	CrocSDK.CapabilityAPI.prototype.getWatchData = function(address) {
+		var uri = CrocSDK.Util.normaliseAddress(address);
+		address = uri.toAor().replace(/^sip:/, '');
+
 		return this.watchDataCache[address] || null;
 	};
 
 	/**
-	 * <p>
 	 * Dispatched when Crocodile RTC JavaScript Library receives a capabilities
 	 * query from another instance.
-	 * </p>
-	 * 
 	 * <p>
 	 * If this event is not handled the Crocodile RTC JavaScript Library will
 	 * automatically respond based on the capabilities set in the
 	 * {@link CrocSDK.Croc Croc} Object instance.
-	 * </p>
 	 * 
 	 * @memberof CrocSDK.CapabilityAPI
-	 * @param {CrocSDK.CapabilityAPI~OnWatchRequestEvent}
-	 *            [OnWatchRequestEvent] The event object associated to this
-	 *            event.
+	 * @param {CrocSDK.CapabilityAPI~WatchRequestEvent} event
+	 * The event object associated with this event.
 	 * @event CrocSDK.CapabilityAPI#onWatchRequest
 	 */
 	CrocSDK.CapabilityAPI.prototype.onWatchRequest = function() {
@@ -623,20 +669,15 @@
 	};
 
 	/**
-	 * <p>
 	 * Dispatched when Crocodile RTC JavaScript Library receives a capabilities
 	 * query response.
-	 * </p>
-	 * 
 	 * <p>
 	 * If this event is not handled the Crocodile RTC JavaScript Library will
 	 * cache the capabilities.
-	 * </p>
 	 * 
 	 * @memberof CrocSDK.CapabilityAPI
-	 * @param {CrocSDK.CapabilityAPI~OnWatchChangedEvent}
-	 *            [OnWatchChangedEvent] The event object associated to this
-	 *            event.
+	 * @param {CrocSDK.CapabilityAPI~WatchChangeEvent} event
+	 * The event object associated with this event.
 	 * @event CrocSDK.CapabilityAPI#onWatchChange
 	 */
 	CrocSDK.CapabilityAPI.prototype.onWatchChange = function() {
@@ -644,13 +685,17 @@
 	};
 
 	/* Further Documentation */
+
 	// Members
+
 	/**
 	 * @memberof CrocSDK.CapabilityAPI
 	 * @member {Number} refreshPeriod
 	 * @instance
 	 */
+
 	// Type Definitions
+
 	/**
 	 * Valid status are:
 	 * <ul>
@@ -669,28 +714,31 @@
 	 * @memberof CrocSDK.CapabilityAPI
 	 * @typedef {String} CrocSDK.CapabilityAPI~status
 	 */
+
 	/**
 	 * @memberof CrocSDK.CapabilityAPI
-	 * @typedef CrocSDK.CapabilityAPI~OnWatchRequestEvent
+	 * @typedef CrocSDK.CapabilityAPI~WatchRequestEvent
 	 * @property {String} [address] The <code>address</code> of the user that
 	 *           sent this capabilities query.
 	 * @property {Function} [setWatchStatus] Sets the &#34;watch
 	 *            {@link CrocSDK.CapabilityAPI~status status}&#34; to return in
 	 *            response to the capabilities query that generated this event.        
 	 */
+
 	/**
 	 * @memberof CrocSDK.CapabilityAPI
-	 * @typedef CrocSDK.CapabilityAPI~OnWatchChangedEvent
-	 * @property {String} address The <code>address</code> of the user that
-	 *           sent this capabilities query.
-	 * @property {String} status The watch
-	 *           {@link CrocSDK.CapabilityAPI~status status} of the user
-	 *           indicated by the response.
-	 * @property {CrocSDK.Croc~Capabilities} capabilities When
-	 *           {@link CrocSDK.CapabilityAPI~status status} is
-	 *           <code>normal</code> this indicates the capabilities of the
-	 *           remote instance of Crocodile RTC JavaScript Library. When
-	 *           {@link CrocSDK.CapabilityAPI~status status} is not
-	 *           <code>normal</code> this will be <code>null</code>.
+	 * @typedef CrocSDK.CapabilityAPI~WatchChangeEvent
+	 * @property {String} address
+	 * The address of the user being watched, and whose data has changed.
+	 * @property {JsSIP.URI} instanceAddress
+	 * The unique address assigned to the client instance that sent the
+	 * response.
+	 * @property {CrocSDK.CapabilityAPI~status} status
+	 * The watch status of the user indicated by the response.
+	 * @property {CrocSDK.Croc~Capabilities} capabilities
+	 * The reported capabilities of the remote user's client instance.
+	 * If these are not reported (i.e. if the <code>status</code> is not
+	 * <code>normal</code>) this property will be <code>null</code>.
 	 */
+
 }(CrocSDK));

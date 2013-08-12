@@ -847,7 +847,7 @@
 			// Close any data sessions for this address (effectively also
 			// "unlocks" the session, see RFC 6121 section 5.1)
 			var dataSession = this.crocObject.data.xmppDataSessions[bareFrom];
-			if (dataSession && dataSession.uniqueAddress === request.getFrom()) {
+			if (dataSession && dataSession.instanceAddress === request.getFrom()) {
 				dataSession.close();
 			}
 		} else {
@@ -886,7 +886,8 @@
 			// It's us - fire onSelfNotify
 			this.currentPresence = request;
 			CrocSDK.Util.fireEvent(this, 'onSelfNotify', {
-				uniqueAddress: from.toString(),
+				instanceAddress: from.toString(),
+				uniqueAddress: from.toString(),		// Deprecated
 				availability: availability,
 				status: status,
 				extraNodes: extraNodes
@@ -900,7 +901,8 @@
 			// Some other user, must be directed presence
 			CrocSDK.Util.fireEvent(this, 'onDirectNotify', {
 				address: bareFrom,
-				uniqueAddress: from.toString(),
+				instanceAddress: from.toString(),
+				uniqueAddress: from.toString(),		// Deprecated
 				availability: availability,
 				status: status,
 				extraNodes: extraNodes
@@ -1164,7 +1166,7 @@
 	 * 
 	 * @event CrocSDK.XmppPresenceAPI#onSelfNotify
 	 * @type {Object}
-	 * @property {string} uniqueAddress The full, unique address of the
+	 * @property {string} instanceAddress The full, unique address of the
 	 * client instance that sent the presence update.
 	 * @property {CrocSDK.XmppPresenceAPI~availability} availability
 	 * The current availability of the client instance.
@@ -1186,7 +1188,7 @@
 	 * 
 	 * @event CrocSDK.XmppPresenceAPI#onDirectNotify
 	 * @type {Object}
-	 * @property {string} uniqueAddress The full, unique address of the
+	 * @property {string} instanceAddress The full, unique address of the
 	 * client instance that sent the presence update.
 	 * @property {string} address The address of the client instance that sent
 	 * the presence update.

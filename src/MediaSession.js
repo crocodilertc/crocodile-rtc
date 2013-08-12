@@ -569,7 +569,7 @@
 			sipOptions.extraHeaders.push('Call-Info: <xmpp:' +
 					crocObject.address + '> ;purpose=impp');
 
-			self.sipSession.connect('sip:' + self.address, sipOptions);
+			self.sipSession.connect(self.address, sipOptions);
 
 			CrocSDK.Util.fireEvent(self, 'onConnecting', {});
 		});

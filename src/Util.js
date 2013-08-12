@@ -1,5 +1,10 @@
 (function (CrocSDK) {
-	CrocSDK.Util = {};
+	/**
+	 * @private
+	 * @namespace
+	 * @alias CrocSDK.Util
+	 */
+	var Util = {};
 	
 	/**
 	 * Map of basic types to the equivalent wrapper object constructor.
@@ -23,7 +28,7 @@
 	 * of that type.
 	 * @returns {boolean}
 	 */
-	CrocSDK.Util.isType = function (target, type) {
+	Util.isType = function (target, type) {
 		if (type.lastIndexOf('[]') === -1) {
 			// Raw type
 			if (typeof target === type) {
@@ -63,7 +68,7 @@
 			onProgress: 'function'
 	};
 	
-	CrocSDK.Util.checkSendConfig = function (config) {
+	Util.checkSendConfig = function (config) {
 		// Loop through each of the provided config properties
 		for (var prop in config) {
 			var allowedType = sendConfigTypes[prop];
@@ -82,7 +87,7 @@
 		}
 	};
 
-	CrocSDK.Util.websocketCauseToSdkStatus = function (cause) {
+	Util.websocketCauseToSdkStatus = function (cause) {
 		switch (cause) {
 		case 1000:
 			return 'normal';
@@ -91,7 +96,7 @@
 		}
 	};
 
-	CrocSDK.Util.jsSipCauseToSdkStatus = function (cause) {
+	Util.jsSipCauseToSdkStatus = function (cause) {
 		switch (cause) {
 		case JsSIP.C.causes.BUSY:
 			return 'normal';
@@ -118,7 +123,7 @@
 		480: 'offline' // Temporarily Unavailable
 	};
 	
-	CrocSDK.Util.sipStatusToSdkStatus = function (sipStatus) {
+	Util.sipStatusToSdkStatus = function (sipStatus) {
 		return sipStatusToSdkStatus[sipStatus];
 	};
 
@@ -137,11 +142,11 @@
 			}
 	};
 
-	CrocSDK.Util.sdkStatusToSipStatus = function (sipMethod, sdkStatus) {
+	Util.sdkStatusToSipStatus = function (sipMethod, sdkStatus) {
 		return sdkStatusToSipStatus[sipMethod][sdkStatus];
 	};
 
-	CrocSDK.Util.fireEvent = function (parent, event, data, runDefault) {
+	Util.fireEvent = function (parent, event, data, runDefault) {
 		if (runDefault || parent.hasOwnProperty(event)) {
 			try {
 				parent[event](data);
@@ -152,7 +157,7 @@
 		}
 	};
 	
-	CrocSDK.Util.randomAlphanumericString = function (len) {
+	Util.randomAlphanumericString = function (len) {
 		var str = Math.random().toString(36).substr(2);
 
 		while (str.length < len) {
@@ -172,7 +177,7 @@
 	 * @param {DocumentFragment|String} body - The XHTML body fragment.
 	 * @returns {String} A valid XHTML document incorporating the provided body.
 	 */
-	CrocSDK.Util.createValidXHTMLDoc = function (body) {
+	Util.createValidXHTMLDoc = function (body) {
 		if (body instanceof window.DocumentFragment) {
 			// Use XMLSerializer to convert into a string
 			var s = new XMLSerializer();
@@ -194,7 +199,7 @@
 	 * @param {String} xhtml - The XHTML document.
 	 * @returns {DocumentFragment} The extracted contents of the document body.
 	 */
-	CrocSDK.Util.extractXHTMLBody = function (xhtml) {
+	Util.extractXHTMLBody = function (xhtml) {
 		var parser = new DOMParser();
 		var doc = parser.parseFromString(xhtml, 'application/xhtml+xml');
 		var df = doc.createDocumentFragment();
@@ -213,11 +218,11 @@
 		'idle': 'idle'
 	};
 	
-	CrocSDK.Util.rfc3994StateToSdkState = function (rfc3994State) {
+	Util.rfc3994StateToSdkState = function (rfc3994State) {
 		return rfc3994StateToSdkState[rfc3994State];
 	};
 
-	CrocSDK.Util.createIsComposingXml = function (sdkState, refresh) {
+	Util.createIsComposingXml = function (sdkState, refresh) {
 		var xml = '<isComposing xmlns="urn:ietf:params:xml:ns:im-iscomposing">';
 		var state;
 		if (sdkState === 'composing') {
@@ -231,4 +236,35 @@
 		}
 		return xml + '</isComposing>';
 	};
+
+	/**
+	 * Shallow copies all of the properties from the source object into the
+	 * target object.  If a matching property is already present in the
+	 * target object, it is overwritten.
+	 * @param {Object} target
+	 * @param {Object} source
+	 */
+	Util.shallowCopy = function(target, source) {
+		for (var prop in source) {
+			if (source.hasOwnProperty(prop)) {
+				target[prop] = source[prop];
+			}
+		}
+	};
+
+	/**
+	 * Normalises the provided address to a JsSIP URI.
+	 * @param {String} address
+	 * @returns {JsSIP.URI}
+	 * @throws {CrocSDK.Exceptions.ValueError}
+	 */
+	Util.normaliseAddress = function(address) {
+		try {
+			return JsSIP.Utils.normalizeURI(address, 'crocodilertc.net');
+		} catch (e) {
+			throw new CrocSDK.Exceptions.ValueError('Invalid address: ' + address);
+		}
+	};
+
+	CrocSDK.Util = Util;
 }(CrocSDK));

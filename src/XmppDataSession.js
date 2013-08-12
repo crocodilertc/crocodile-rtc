@@ -26,7 +26,7 @@
 
 		// Public properties
 		this.address = address;
-		this.uniqueAddress = null;
+		this.instanceAddress = null;
 		this.displayName = null;
 		this.customHeaders = null;
 		this.capabilities = null;
@@ -37,8 +37,8 @@
 	 * Internal methods
 	 */
 
-	CrocSDK.XmppDataSession.prototype._setUniqueAddress = function (uniqueAddress) {
-		this.uniqueAddress = uniqueAddress;
+	CrocSDK.XmppDataSession.prototype._setInstanceAddress = function (instanceAddress) {
+		this.instanceAddress = instanceAddress;
 	};
 
 	/**
@@ -77,14 +77,16 @@
 
 			CrocSDK.Util.fireEvent(this, 'onXHTMLReceived', {
 				address: this.address,
-				uniqueAddress: this.uniqueAddress,
+				instanceAddress: this.instanceAddress,
+				uniqueAddress: this.instanceAddress,	// Deprecated
 				body: df
 			}, true);
 		} else if (body) {
 			// Just use the plain text body
 			CrocSDK.Util.fireEvent(this, 'onData', {
 				address: this.address,
-				uniqueAddress: this.uniqueAddress,
+				instanceAddress: this.instanceAddress,
+				uniqueAddress: this.instanceAddress,	// Deprecated
 				contentType: 'text/plain',
 				data: body
 			}, true);
@@ -145,7 +147,7 @@
 	 */
 	CrocSDK.XmppDataSession.prototype._sendChatState = function (xmppChatState) {
 		var xmppMsg = new JSJaCMessage();
-		xmppMsg.setTo(this.uniqueAddress || this.address);
+		xmppMsg.setTo(this.instanceAddress || this.address);
 		xmppMsg.appendNode(xmppMsg.buildNode(xmppChatState, null, null, NS_CHAT_STATES));
 		this.dataApi.crocObject.xmppCon.send(xmppMsg);
 		this.localChatState = xmppChatState;
@@ -209,7 +211,7 @@
 		}
 
 		var xmppMsg = new JSJaCMessage();
-		xmppMsg.setTo(this.uniqueAddress || this.address);
+		xmppMsg.setTo(this.instanceAddress || this.address);
 		xmppMsg.setBody(data);
 
 		if (this.supportsChatState) {
@@ -251,7 +253,7 @@
 		}
 
 		var xmppMsg = new JSJaCMessage();
-		xmppMsg.setTo(this.uniqueAddress || this.address);
+		xmppMsg.setTo(this.instanceAddress || this.address);
 
 		var bodyNode;
 		if (CrocSDK.Util.isType(body, 'string')) {

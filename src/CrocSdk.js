@@ -313,9 +313,8 @@ var CrocSDK = {};
 			 * </p>
 			 * 
 			 * @event CrocSDK.Croc#onConnected
-			 * @param {CrocSDK.Croc~OnConnectedEvent}
-			 *            onConnectedEvent The event object associated to this
-			 *            event
+			 * @param {CrocSDK.Croc~ConnectedEvent} event
+			 * The event object associated with this event.
 			 */
 			CrocSDK.Util.fireEvent(croc, 'onConnected', {});
 		});
@@ -332,15 +331,14 @@ var CrocSDK = {};
 			 * </p>
 			 * 
 			 * @event CrocSDK.Croc#onDisconnected
-			 * @param {CrocSDK.Croc~OnDisconnectedEvent}
-			 *            onDisconnectedEvent The event object associated to
-			 *            this event
+			 * @param {CrocSDK.Croc~DisconnectedEvent} event
+			 * The event object associated with this event.
 			 */
 			CrocSDK.Util.fireEvent(croc, 'onDisconnected', {
 				status : CrocSDK.Util.websocketCauseToSdkStatus(event.data.code)
 			});
 		});
-		croc.sipUA.on('registered', function() {
+		croc.sipUA.on('registered', function(event) {
 			/**
 			 * <p>
 			 * Dispatched when the Crocodile RTC JavaScript Library has
@@ -353,11 +351,25 @@ var CrocSDK = {};
 			 * </p>
 			 * 
 			 * @event CrocSDK.Croc#onRegistered
-			 * @param {CrocSDK.Croc~OnRegisteredEvent}
-			 *            onRegisteredEvent The event object associated to
-			 *            this event
+			 * @param {CrocSDK.Croc~RegisteredEvent} event
+			 * The event object associated with this event.
 			 */
-			CrocSDK.Util.fireEvent(croc, 'onRegistered', {});
+			var response = event.data.response;
+			var numContacts = response.countHeader('contact');
+			var idx, contactHeader;
+			var gruus = [];
+			for (idx = 0; idx < numContacts; idx++) {
+				contactHeader = response.parseHeader('contact', idx);
+				if (contactHeader.uri.user !== croc.sipUA.contact.uri.user) {
+					var gruu = contactHeader.getParam('pub-gruu');
+					if (gruu) {
+						gruus.push(gruu.replace(/"/g,''));
+					}
+				}
+			}
+			CrocSDK.Util.fireEvent(croc, 'onRegistered', {
+				instanceAddresses: gruus
+			});
 		});
 		croc.sipUA.on('unregistered', function() {
 			/**
@@ -372,9 +384,8 @@ var CrocSDK = {};
 			 * </p>
 			 * 
 			 * @event CrocSDK.Croc#onUnregistered
-			 * @param {CrocSDK.Croc~OnUnregisteredEvent}
-			 *            onUnregisteredEvent The event object associated to
-			 *            this event
+			 * @param {CrocSDK.Croc~UnregisteredEvent} event
+			 * The event object associated with this event.
 			 */
 			CrocSDK.Util.fireEvent(croc, 'onUnregistered', {});
 		});
@@ -403,9 +414,8 @@ var CrocSDK = {};
 			 * </p>
 			 * 
 			 * @event CrocSDK.Croc#onRegistrationFailed
-			 * @param {CrocSDK.Croc~OnRegistrationFailedEvent}
-			 *            onRegistrationFailedEvent The event object associated to
-			 *            this event
+			 * @param {CrocSDK.Croc~RegistrationFailedEvent} event
+			 * The event object associated with this event.
 			 */
 			CrocSDK.Util.fireEvent(croc, 'onRegistrationFailed', {
 				cause : cause
@@ -1088,7 +1098,7 @@ var CrocSDK = {};
 	 * @property {Boolean} [sip.video=detected] <code>true</code> if the
 	 *           browser supports PeerConnection. Even if there is no web-cam it
 	 *           might be possible to receive video.
-	 * @property {Number} [croc.sdkversion=1] Cannot be changed or overridden.
+	 * @property {String} [croc.sdkversion='1'] Cannot be changed or overridden.
 	 * @property [custom.<String>] Web-app developers can create their own
 	 *           capabilities within the <code>custom.</code> namespace.
 	 *           Custom capabilities may be simple present/not-present tags or
@@ -1096,23 +1106,35 @@ var CrocSDK = {};
 	 */
 	/**
 	 * @memberof CrocSDK.Croc
-	 * @typedef CrocSDK.Croc~OnConnectedEvent
+	 * @typedef CrocSDK.Croc~ConnectedEvent
 	 */
 	/**
 	 * @memberof CrocSDK.Croc
-	 * @typedef CrocSDK.Croc~OnDisconnectedEvent
+	 * @typedef CrocSDK.Croc~DisconnectedEvent
 	 */
 	/**
 	 * @memberof CrocSDK.Croc
-	 * @typedef CrocSDK.Croc~OnRegisteredEvent
+	 * @typedef CrocSDK.Croc~RegisteredEvent
+	 * @property {Array.<JsSIP.URI>} instanceAddresses
+	 * An array containing the unique addresses of other client instances
+	 * currently registered on the network as this user. If the user is not
+	 * logged in on any other clients, the array will be empty.
+	 * <p>
+	 * The unique addresses can be used to target a request at specific client
+	 * instance.  Currently they can be used with the following:
+	 * <ul>
+	 * <li>Capabilities requests (using the
+	 * {@link CrocSDK.CapabilityAPI#query query} method)</li>
+	 * <li>MSRP data sessions</li>
+	 * </ul>
 	 */
 	/**
 	 * @memberof CrocSDK.Croc
-	 * @typedef CrocSDK.Croc~OnUnregisteredEvent
+	 * @typedef CrocSDK.Croc~UnregisteredEvent
 	 */
 	/**
 	 * @memberof CrocSDK.Croc
-	 * @typedef CrocSDK.Croc~OnRegistrationFailedEvent
+	 * @typedef CrocSDK.Croc~RegistrationFailedEvent
 	 * @property {String} cause The message stating why the registration 
 	 * process failed.
 	 */

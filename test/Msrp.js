@@ -49,7 +49,7 @@
 	var strData3 = "third expected string of data";
 
 	QUnit.module("MSRP");
-	
+
 	QUnit.asyncTest("Send with no MSRP relays", 1, function(assert) {
 		var config = {
 			apiKey: testApiKey,
@@ -144,12 +144,12 @@
 		// Set up the receiver's event handlers
 		croc2.data.onDataSession = function (event) {
 			assert.ok(true, 'onDataSession fired');
-			
+
 			// Check event object properties
 			assert.ok(event.session instanceof CrocSDK.IncomingMsrpSession,
 					'Got DataSession object');
 			assert.strictEqual(event.fileTransfer, null, 'No FileTransferInfo');
-			
+
 			// Check incoming session properties
 			assert.strictEqual(event.session.address, config1.address, 
 					'Incoming session address correct');
@@ -171,7 +171,7 @@
 
 		croc2.data.onData = function (event) {
 			assert.ok(true, 'onData fired');
-			
+
 			// Check event object properties
 			assert.strictEqual(event.address, config1.address, 'Event address correct');
 			assert.strictEqual(event.contentType, 'text/plain', 'Expected MIME type');
@@ -185,7 +185,7 @@
 				customHeaders: testCustomHeaders,
 				onSuccess: function () {
 					assert.ok(true, 'TransferProgress.onSuccess event fired');
-					
+
 					// Successful send - close the session
 					this.session.close();
 				},
@@ -194,7 +194,7 @@
 				},
 				onProgress: function (event) {
 					assert.ok(true, 'TransferProgress.onProgress event fired');
-					
+
 					// Check event object properties
 					assert.strictEqual(event.bytesComplete, strData.length, 'Expected bytesComplete');
 					assert.strictEqual(event.percentComplete, 100, 'Expected percentComplete');
@@ -212,7 +212,7 @@
 					assert.strictEqual(this.session.getState(), 'established', 'Session state = established');
 				}
 			});
-			
+
 			// Check outgoing session properties
 			assert.ok(session instanceof CrocSDK.OutgoingMsrpSession,
 					'Got DataSession object');
@@ -250,7 +250,7 @@
 		// Set up the receiver's event handlers
 		croc2.data.onDataSession = function (event) {
 			assert.ok(true, 'onDataSession fired');
-			
+
 			// Check incoming session properties
 			assert.ok(event.session.customHeaders.isEmpty(), 
 					'Incoming session customHeaders correct');
@@ -268,7 +268,7 @@
 
 		croc2.data.onData = function (event) {
 			assert.ok(true, 'onData fired');
-			
+
 			// Check event object properties
 			assert.strictEqual(event.address, config1.address, 'Event address correct');
 			assert.strictEqual(event.contentType, 'text/plain', 'Expected MIME type');
@@ -281,7 +281,7 @@
 				type: 'msrp',
 				onSuccess: function () {
 					assert.ok(true, 'TransferProgress.onSuccess event fired');
-					
+
 					// Successful send - close the session
 					this.session.close();
 				},
@@ -290,7 +290,7 @@
 				},
 				onProgress: function () {
 					assert.ok(true, 'TransferProgress.onProgress event fired');
-					
+
 					// Check outgoing session properties 2
 					assert.deepEqual(this.session.capabilities, croc2.capabilities, 
 							'Outgoing session data capability correct');
@@ -299,7 +299,7 @@
 					assert.strictEqual(this.session.getState(), 'established', 'Session state = established');
 				}
 			});
-			
+
 			// Clean up the croc objects when the session closes
 			session.onClose = function () {
 				assert.ok(true, 'DataSession.onClose event fired');
@@ -331,11 +331,11 @@
 		// Set up the receiver's event handlers
 		croc2.data.onDataSession = function (event) {
 			assert.ok(true, 'onDataSession fired');
-			
+
 			// Add session-level onData handler
 			event.session.onData = function (event) {
 				assert.ok(true, 'Session-level onData fired');
-				
+
 				// Check event object properties
 				assert.strictEqual(event.address, config1.address, 'Event address correct');
 				assert.strictEqual(event.contentType, 'application/octet-stream', 'Expected MIME type');
@@ -356,7 +356,7 @@
 				type: 'msrp',
 				onSuccess: function () {
 					assert.ok(true, 'TransferProgress.onSuccess event fired');
-					
+
 					// Successful send - close the session
 					this.session.close();
 				},
@@ -365,7 +365,7 @@
 				},
 				onProgress: function () {
 					assert.ok(true, 'TransferProgress.onProgress event fired');
-					
+
 					// Check outgoing session properties 2
 					assert.deepEqual(this.session.capabilities, croc2.capabilities, 
 							'Outgoing session data capability correct');
@@ -374,7 +374,7 @@
 					assert.strictEqual(this.session.getState(), 'established', 'Session state = established');
 				}
 			});
-			
+
 			// Clean up the croc objects when the session closes
 			session.onClose = function () {
 				assert.ok(true, 'DataSession.onClose event fired');
@@ -402,24 +402,24 @@
 		for (var i = 0; i < uint16view.length; i++) {
 			uint16view[i] = i;
 		}
-		
+
 		var blob = new Blob([uint16view]);
 		var reader = new FileReader();
-		
+
 		// Set up the receiver's event handlers
 		croc2.data.onDataSession = function (event) {
 			assert.ok(true, 'onDataSession fired');
-			
+
 			// Add session-level onData handler
 			event.session.onData = function (event) {
 				assert.ok(true, 'Session-level onData fired');
-				
+
 				// Check event object properties
 				assert.strictEqual(event.address, config1.address, 'Event address correct');
 				assert.strictEqual(event.contentType, 'application/octet-stream', 'Expected MIME type');
-				
+
 				reader.readAsArrayBuffer(event.data);
-				
+
 				// setup file reader event handlers
 				reader.onload = function(evt) {
 					assert.ok(true, 'FileReader.onload fired');
@@ -432,19 +432,19 @@
 
 			event.session.accept();
 		};		
-		
+
 		// Top-level onData should not fire when session catches it
 		croc2.data.onData = function () {
 			assert.ok(false, 'Top-level onData fired');
 		};
-		
+
 		// Wait for receiver to register before sending the data
 		croc2.sipUA.on('registered', function () {
 			var session = croc1.data.send(config2.address, blob, {
 				type: 'msrp',
 				onSuccess: function () {
 					assert.ok(true, 'TransferProgress.onSuccess event fired');
-					
+
 					// Successful send - close the session
 					this.session.close();
 				},
@@ -458,7 +458,7 @@
 					assert.strictEqual(this.session.getState(), 'established', 'Session state = established');
 				}
 			});
-			
+
 			// Clean up the croc objects when the session closes
 			session.onClose = function () {
 				assert.ok(true, 'DataSession.onClose event fired');
@@ -467,7 +467,7 @@
 				croc2.disconnect();
 			};
 		});
-		
+
 		// QUnit will restart once the second croc object has disconnected
 	});
 
@@ -481,20 +481,20 @@
 			croc1.disconnect();
 			croc2.disconnect();
 		}, 10000);
-		
+
 		// Setup event handlers for croc2 (receiver - sender)
 		croc2.data.onDataSession = function (event) {
 			assert.ok(true, 'croc2 onDataSession fired');
 
 			// Check immediate accept behaviour
 			event.session.accept();
-			
+
 			croc2Session = event.session;
 		};
 
 		croc2.data.onData = function (event) {
 			assert.ok(true, 'croc2 onData fired');
-			
+
 			// Check event object properties
 			assert.strictEqual(event.address, config1.address, 'Event address correct');
 			assert.strictEqual(event.contentType, 'text/plain', 'Expected MIME type');
@@ -503,25 +503,25 @@
 
 		croc1.data.onData = function (event) {
 			assert.ok(true, 'croc1 onData fired');
-			
+
 			// Check event object properties
 			assert.strictEqual(event.address, config2.address, 'Event address correct');
 			assert.strictEqual(event.contentType, 'text/plain', 'Expected MIME type');
 			assert.strictEqual(event.data, strData2, 'Expected string data');
 		};
-		
+
 		// Wait for first receiver to register before sending the data
 		croc2.sipUA.on('registered', function () {
 			croc1.data.send(config2.address, strData, {
 				type: 'msrp',
 				onSuccess: function () {
 					assert.ok(true, 'TransferProgress.onSuccess event fired');
-					
+
 					croc2Session.send(strData2, {
 						type: 'msrp',
 						onSuccess: function () {
 							assert.ok(true, 'TransferProgress.onSuccess event fired');
-							
+
 							// Successful send - close the session
 							this.session.close();
 						},
@@ -555,7 +555,7 @@
 				}
 			});
 		});
-		
+
 		// QUnit will restart once the second croc object has disconnected
 	});
 
@@ -579,7 +579,7 @@
 
 		croc2.data.onData = function (event) {
 			assert.ok(true, 'onData fired');
-			
+
 			// Check event object properties
 			assert.strictEqual(event.address, config1.address, 'Event address correct');
 			assert.strictEqual(event.contentType, 'text/plain', 'Expected MIME type');
@@ -593,7 +593,7 @@
 				assert.ok(false, "unexpected data arrrived, should not have fired");
 			}
 		};
-		
+
 		// Wait for receiver to register before sending the data
 		croc2.sipUA.on('registered', function () {
 			var session = croc1.data.send(config2.address, strData, {
@@ -615,7 +615,7 @@
 								},
 								onProgress: function () {
 									assert.ok(true, 'TransferProgress.onProgress event fired');
-									
+
 									// Check session state
 									assert.strictEqual(this.session.getState(), 'established', 'Session state = established');
 								}
@@ -626,7 +626,7 @@
 						},
 						onProgress: function () {
 							assert.ok(true, 'TransferProgress.onProgress event fired');
-							
+
 							// Check session state
 							assert.strictEqual(this.session.getState(), 'established', 'Session state = established');
 						}
@@ -637,7 +637,7 @@
 				},
 				onProgress: function () {
 					assert.ok(true, 'TransferProgress.onProgress event fired');
-					
+
 					// Check session state
 					assert.strictEqual(this.session.getState(), 'established', 'Session state = established');
 				}
@@ -662,24 +662,24 @@
 			croc1.disconnect();
 			croc2.disconnect();
 		}, 10000);
-		
+
 		// Set up the receiver's event handlers
 		croc2.data.onDataSession = function (event) {
 			assert.ok(true, 'onDataSession fired');
-			
+
 			// Check immediate accept behaviour
 			event.session.accept();
 		};
 
 		croc2.data.onData = function (event) {
 			assert.ok(true, 'onData fired');
-			
+
 			// Check event object properties
 			assert.strictEqual(event.address, config1.address, 'Event address correct');
 			assert.strictEqual(event.contentType, 'text/plain', 'Expected MIME type');
 			assert.strictEqual(event.data, strData, 'Expected string data');
 		};
-		
+
 		// Wait for receiver to register before sending the data
 		croc2.sipUA.on('registered', function () {
 			var session = croc1.data.send(config2.address, strData, {
@@ -702,7 +702,7 @@
 							assert.strictEqual(this.session.getState(), 'established', 'Session state = established');
 						}
 					});
-						
+
 					// Clean up the croc objects when the session closes
 					sessionreuse.onClose = function () {
 						assert.ok(true, 'DataSession.onClose event fired');
@@ -733,7 +733,7 @@
 			croc3.disconnect();
 			croc2.disconnect();
 		}, 10000);
-		
+
 		// Set up the receiver's event handlers
 		croc2.data.onDataSession = function (event) {
 			assert.ok(true, 'onDataSession fired');
@@ -743,7 +743,7 @@
 
 		croc2.data.onData = function (event) {
 			assert.ok(true, 'onData fired');
-			
+
 			// Check event object properties
 			assert.strictEqual(event.address, config1.address, 'Event address correct');
 			assert.strictEqual(event.contentType, 'text/plain', 'Expected MIME type');
@@ -759,13 +759,13 @@
 
 		croc3.data.onData = function (event) {
 			assert.ok(true, 'session2 onData fired');
-			
+
 			// Check event object properties
 			assert.strictEqual(event.address, config1.address, 'Event address correct');
 			assert.strictEqual(event.contentType, 'text/plain', 'Expected MIME type');
 			assert.strictEqual(event.data, strData2, 'Expected string data for session2');
 		};
-		
+
 		// Wait for receiver to register before sending the data
 		croc2.sipUA.on('registered', function () {
 			var session = croc1.data.send(config2.address, strData, {
@@ -787,7 +787,7 @@
 							assert.strictEqual(this.session.getState(), 'established', 'Session state = established');
 						}
 					});
-					
+
 					// Clean up the croc objects when the session closes
 					session2.onClose = function () {
 						assert.ok(true, 'session2 DataSession.onClose event fired');
@@ -817,7 +817,7 @@
 			croc1.disconnect();
 			croc2.disconnect();
 		}, 10000);
-		
+
 		// Can't use underscore in header names, as JsSIP converts to dash
 		var sessionCustomHeaders = new CrocSDK.CustomHeaders({
 				"X-Foo": 'bar'
@@ -825,7 +825,7 @@
 		var session2CustomHeaders = new CrocSDK.CustomHeaders({
 				"X-Test-.!%*+`'~0123456789": 'Yee-ha!'
 		});
-		
+
 		// Set up the receiver's event handlers
 		croc2.data.onDataSession = function (event) {
 			assert.ok(true, 'onDataSession fired');
@@ -838,13 +838,13 @@
 			} else {
 				assert.ok(false, "Unexpected result; should not have fired");
 			}
-			
+
 			event.session.accept();
 		};
 
 		croc2.data.onData = function (event) {
 			assert.ok(true, 'onData fired');
-			
+
 			// Check event object properties
 			assert.strictEqual(event.address, config1.address, 'Event address correct');
 			assert.strictEqual(event.contentType, 'text/plain', 'Expected MIME type');
@@ -856,7 +856,7 @@
 				assert.ok(false, "Unexpected result; should not have fired");
 			}
 		};
-		
+
 		// Wait for receiver to register before sending the data
 		croc2.sipUA.on('registered', function () {
 			var session = croc1.data.send(config2.address, strData, {
@@ -880,7 +880,7 @@
 							assert.strictEqual(this.session.getState(), 'established', 'Session state = established');
 						}
 					});
-					
+
 					// Clean up the croc objects when the session closes
 					session2.onClose = function () {
 						assert.ok(true, 'session2 DataSession.onClose event fired');
@@ -911,7 +911,7 @@
 			croc1.disconnect();
 			croc2.disconnect();
 		}, 10000);
-		
+
 		var fileTransferParams = {
 			description: "test data"
 		};
@@ -919,27 +919,27 @@
 		for (var i = 0; i < uint16view.length; i++) {
 			uint16view[i] = i;
 		}
-		
+
 		var blob = new Blob([uint16view]);
 		var reader = new FileReader();
-		
+
 		// Set up the receiver's event handlers
 		croc2.data.onDataSession = function (event) {
 			assert.ok(true, 'onDataSession fired');
-			
+
 			// test description can be set; name, size and disposition are automatically configured
 			assert.strictEqual(event.fileTransfer.description, fileTransferParams.description, "expected fileTransferInfo");
-			
+
 			// Add session-level onData handler
 			event.session.onData = function (event) {
 				assert.ok(true, 'Session-level onData fired');
-				
+
 				// Check event object properties
 				assert.strictEqual(event.address, config1.address, 'Event address correct');
 				assert.strictEqual(event.contentType, 'application/octet-stream', 'Expected MIME type');
-				
+
 				reader.readAsArrayBuffer(event.data);
-				
+
 				// setup file reader event handlers
 				reader.onload = function(evt) {
 					assert.ok(true, 'FileReader.onload fired');
@@ -952,12 +952,12 @@
 
 			event.session.accept();
 		};		
-		
+
 		// Top-level onData should not fire when session catches it
 		croc2.data.onData = function () {
 			assert.ok(false, 'Top-level onData fired');
 		};
-		
+
 		// Wait for receiver to register before sending the data
 		croc2.sipUA.on('registered', function () {
 			var session = croc1.data.send(config2.address, blob, {
@@ -982,9 +982,9 @@
 							// Check session state
 							assert.strictEqual(this.session.getState(), 'established', 'Session state = established');
 						}
-						
+
 					});
-					
+
 					// Clean up the croc objects when the session closes
 					session2.onClose = function () {
 						assert.ok(true, 'session2 DataSession.onClose event fired');
@@ -1005,7 +1005,7 @@
 			});
 		});
 	});
-	
+
 	QUnit.asyncTest("session.send before session is established", 2, function(assert) {
 		var croc1 = $.croc(config1);
 		var croc2 = $.croc(config2);
@@ -1014,7 +1014,7 @@
 			croc1.disconnect();
 			croc2.disconnect();
 		}, 4000);
-		
+
 		// Setup event handlers for croc2 (receiver - sender)
 		croc2.data.onDataSession = function (event) {
 			assert.ok(true, 'croc2 onDataSession fired');
@@ -1023,17 +1023,17 @@
 				event.session.send(strData);
 			}, CrocSDK.Exceptions.StateError, "Throws if session tries to send before accepting.");
 		};
-		
+
 		// Wait for first receiver to register before sending the data
 		croc2.sipUA.on('registered', function () {
 			croc1.data.send(config2.address, strData, {
 				type: 'msrp'
 			});
 		});
-		
+
 		// QUnit will restart once the second croc object has disconnected
 	});
-	
+
 	QUnit.asyncTest("accepting an already established session", 3, function(assert) {
 		var croc1 = $.croc(config1);
 		var croc2 = $.croc(config2);
@@ -1043,17 +1043,17 @@
 			croc1.disconnect();
 			croc2.disconnect();
 		}, 4000);
-		
+
 		// Setup event handlers for croc2 (receiver - sender)
 		croc2.data.onDataSession = function (event) {
 			assert.ok(true, 'croc2 onDataSession fired');
 
 			// Check immediate accept behaviour
 			event.session.accept();
-			
+
 			croc2Session = event.session;
 		};
-		
+
 		// Wait for first receiver to register before sending the data
 		croc2.sipUA.on('registered', function () {
 			croc1.data.send(config2.address, strData, {
@@ -1072,10 +1072,10 @@
 				}
 			});
 		});
-		
+
 		// QUnit will restart once the second croc object has disconnected
 	});
-	
+
 	QUnit.asyncTest("Automatic session management - idle session cleanup", 5, function(assert) {
 		var croc1 = $.croc(config1);
 		var croc2 = $.croc(config2);
@@ -1085,7 +1085,7 @@
 			croc1.disconnect();
 			croc2.disconnect();
 		}, 15000);
-		
+
 		croc1.data.idleTimeout = 5;
 
 		// Set up the receiver's event handlers
@@ -1095,7 +1095,7 @@
 			// Check immediate accept behaviour
 			event.session.accept();
 		};
-		
+
 		// Wait for receiver to register before sending the data
 		croc2.sipUA.on('registered', function () {
 			var session = croc1.data.send(config2.address, strData, {
@@ -1111,7 +1111,7 @@
 					assert.strictEqual(this.session.getState(), 'established', 'Session state = established');
 				}
 			});
-			
+
 			// Clean up the croc objects when the session closes
 			session.onClose = function () {
 				assert.ok(true, 'DataSession.onClose event fired via idle session close');
@@ -1119,10 +1119,10 @@
 				croc1.disconnect();
 				croc2.disconnect();
 			};
-			
+
 		});
 	});
-	
+
 	QUnit.asyncTest("Composing state", 5, function(assert) {
 		var croc1 = $.croc(config1);
 		var croc2 = $.croc(config2);
@@ -1208,7 +1208,7 @@
 
 		croc2.data.onXHTMLReceived = function (event) {
 			assert.ok(true, 'onXHTMLReceived fired');
-			
+
 			// Check event object properties
 			var s = new XMLSerializer();
 			var receivedString = s.serializeToString(event.body);
@@ -1238,7 +1238,7 @@
 					assert.ok(false, 'TransferProgress.onFailure event should not fire');
 				}
 			});
-			
+
 			// Clean up the croc objects when the session closes
 			session.onClose = function () {
 				assert.ok(true, 'DataSession.onClose event fired');
@@ -1250,6 +1250,86 @@
 				croc2.disconnect();
 			};
 		});
+
+		// QUnit will restart once the second croc object has disconnected
+	});
+
+	QUnit.asyncTest("Inter-instance data", 14, function(assert) {
+		var croc1a = $.croc(config1);
+		var croc1b = $.croc(config1);
+		// Give up if the test has hung for too long
+		var hungTimerId = setTimeout(function() {
+			assert.ok(false, 'Aborting hung test');
+			croc1a.disconnect();
+			croc1b.disconnect();
+		}, 10000);
+
+		// Configure the QUnit restart
+		croc1b.onDisconnected = config2.onDisconnected;
+
+		croc1b.data.onDataSession = function () {
+			assert.ok(false, 'Session should not fork');
+		};
+
+		// Set up the receiver's event handlers
+		croc1a.data.onDataSession = function (event) {
+			assert.ok(true, 'onDataSession fired');
+
+			// Check event object properties
+			assert.ok(event.session instanceof CrocSDK.IncomingMsrpSession,
+					'Got DataSession object');
+
+			// Check incoming session properties
+			assert.strictEqual(event.session.address, config1.address, 
+					'Incoming session address correct');
+			assert.strictEqual(event.session.displayName, config1.displayName,
+					'Incoming session displayName correct');
+
+			// Check immediate accept behaviour
+			event.session.accept();
+		};
+
+		croc1a.data.onData = function (event) {
+			assert.ok(true, 'onData fired');
+
+			// Check event object properties
+			assert.strictEqual(event.address, config1.address, 'Event address correct');
+			assert.strictEqual(event.contentType, 'text/plain', 'Expected MIME type');
+			assert.strictEqual(event.data, strData, 'Expected string data');
+		};
+
+		// Wait for receiver to register before sending the data
+		croc1b.onRegistered = function(event) {
+			assert.strictEqual(event.instanceAddresses.length, 1, 'Expected number of instances');
+			var session = croc1b.data.send(event.instanceAddresses[0], strData, {
+				type: 'msrp',
+				onSuccess: function () {
+					assert.ok(true, 'TransferProgress.onSuccess event fired');
+
+					// Successful send - close the session
+					this.session.close();
+				},
+				onFailure: function () {
+					assert.ok(false, 'TransferProgress.onFailure event should not fire');
+				}
+			});
+
+			// Check outgoing session properties
+			assert.ok(session instanceof CrocSDK.OutgoingMsrpSession,
+					'Got DataSession object');
+			assert.strictEqual(session.address, config1.address,
+					'Outgoing session address correct');
+			assert.strictEqual(session.displayName,
+					null, 'Outgoing session displayName not cached');
+
+			// Clean up the croc objects when the session closes
+			session.onClose = function () {
+				assert.ok(true, 'DataSession.onClose event fired');
+				clearTimeout(hungTimerId);
+				croc1a.disconnect();
+				croc1b.disconnect();
+			};
+		};
 
 		// QUnit will restart once the second croc object has disconnected
 	});
