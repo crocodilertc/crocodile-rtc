@@ -216,6 +216,8 @@
 		}, constraints);
 		this.localStream = null;
 		this.oldLocalStream = null;
+		this.screenStream = null;
+		this.oldScreenStream = null;
 		this.remoteMediaReceived = false;
 		this.accepted = false;
 		this.offerOutstanding = false;
@@ -336,23 +338,23 @@
 	 * @private
 	 * @param streamConfig
 	 * @param onSuccess
-	 * @returns <code>true</code> if local user media has been requested
-	 * <code>false</code> if we already have (or don't need) local user media
 	 */
 	MediaSession.prototype._getUserMedia = function(streamConfig, onSuccess) {
 		var mediaSession = this;
 		var sc = streamConfig || this.streamConfig;
 		var constraints = {
-			audio : !!sc.audio && sc.audio.send,
-			video : !!sc.video && sc.video.send
+			audio: !!sc.audio && sc.audio.send,
+			video: !!sc.video && sc.video.send && !sc.video.source
 		};
-		// Undocumented screen capture feature, only works in Chrome
-		if (constraints.video && sc.source === 'screen') {
-			constraints.video = {mandatory: {chromeMediaSource: 'screen'}};
-		}
-		var mediaSuccess = function(stream) {
+		var removeOldStream = function() {
 			var oldStream = mediaSession.localStream;
-
+			if (oldStream) {
+				mediaSession.oldLocalStream = oldStream;
+				mediaSession.peerConnection.removeStream(oldStream);
+				mediaSession.localStream = null;
+			}
+		};
+		var mediaSuccess = function(stream) {
 			if (mediaSession.state === mediaSessionState.CLOSED) {
 				// Oops, too late
 				stream.stop();
@@ -360,16 +362,57 @@
 			}
 
 			console.log('Got local media stream');
-			if (oldStream) {
-				mediaSession.oldLocalStream = oldStream;
-				mediaSession.peerConnection.removeStream(oldStream);
-			}
+			removeOldStream();
 			mediaSession.localStream = stream;
 			mediaSession.peerConnection.addStream(stream);
 			if (constraints.video && mediaSession.localVideoElement) {
 				mediaSession.localVideoElement.src = window.URL.createObjectURL(stream);
 				mediaSession.localVideoElement.muted = true;
 			}
+
+			mediaSession._getScreenMedia(sc, onSuccess);
+		};
+		var mediaFailure = function(error) {
+			console.warn('getUserMedia failed:', error);
+			mediaSession.close();
+		};
+
+		if (!constraints.audio && !constraints.video) {
+			removeOldStream();
+
+			// Might want screen media instead
+			this._getScreenMedia(sc, onSuccess);
+			return;
+		}
+
+		JsSIP.WebRTC.getUserMedia(constraints, mediaSuccess, mediaFailure);
+	};
+
+	MediaSession.prototype._getScreenMedia = function(streamConfig, onSuccess) {
+		var mediaSession = this;
+		var requestMedia = true;
+		var constraints = {
+			audio: false,
+			video: {mandatory: {chromeMediaSource: 'screen'}}
+		};
+		var removeOldStream = function() {
+			var oldStream = mediaSession.screenStream;
+			if (oldStream) {
+				mediaSession.oldScreenStream = oldStream;
+				mediaSession.peerConnection.removeStream(oldStream);
+				mediaSession.screenStream = null;
+			}
+		};
+		var mediaSuccess = function(stream) {
+			if (mediaSession.state === mediaSessionState.CLOSED) {
+				// Oops, too late
+				stream.stop();
+				return;
+			}
+
+			console.log('Got local screen stream');
+			mediaSession.screenStream = stream;
+			mediaSession.peerConnection.addStream(stream);
 			if (onSuccess) {
 				onSuccess();
 			}
@@ -379,19 +422,27 @@
 			mediaSession.close();
 		};
 
-		if (!constraints.audio && !constraints.video) {
-			// We don't need any media, but make sure calling function
-			// finishes before calling onSuccess.
+		var videoConfig = streamConfig.video;
+		if (!videoConfig || !videoConfig.send || videoConfig.source !== 'screen') {
+			// Don't want screen sharing
+			removeOldStream();
+			requestMedia = false;
+		} else if (this.screenStream && !this.screenStream.ended) {
+			// We don't need to request media
+			requestMedia = false;
+		}
+
+		if (requestMedia) {
+			JsSIP.WebRTC.getUserMedia(constraints, mediaSuccess, mediaFailure);
+		} else {
+			// Ensure calling function finishes before calling onSuccess to
+			// avoid unexpected behaviour.
 			if (onSuccess) {
 				setTimeout(function() {
 					onSuccess();
 				}, 0);
 			}
-			return false;
 		}
-
-		JsSIP.WebRTC.getUserMedia(constraints, mediaSuccess, mediaFailure);
-		return true;
 	};
 
 	/**
@@ -521,21 +572,35 @@
 	 * @private
 	 */
 	MediaSession.prototype._setRemoteStreamOutput = function() {
-		var stream;
+		var streams, stream, audioTracks, videoTracks;
 		var pc = this.peerConnection;
 
 		if (pc.getRemoteStreams) {
 			// Latest spec uses a method
-			stream = pc.getRemoteStreams()[0];
+			streams = pc.getRemoteStreams();
 		} else {
 			// Older spec used a property (still used by Firefox 22)
-			stream = pc.remoteStreams[0];
+			streams = pc.remoteStreams;
 		}
 
-		if (this.remoteVideoElement) {
-			this.remoteVideoElement.src = window.URL.createObjectURL(stream);
-		} else if (this.remoteAudioElement) {
-			this.remoteAudioElement.src = window.URL.createObjectURL(stream);
+		for (var idx = 0, len = streams.length; idx < len; idx++) {
+			stream = streams[idx];
+			audioTracks = stream.getAudioTracks();
+			videoTracks = stream.getVideoTracks();
+
+			if (videoTracks.length > 0) {
+				if (this.remoteVideoElement) {
+					this.remoteVideoElement.src = window.URL.createObjectURL(stream);
+				} else {
+					console.warn('Video received, but no remoteVideoElement provided');
+				}
+			} else if (audioTracks.length > 0) {
+				if (this.remoteAudioElement) {
+					this.remoteAudioElement.src = window.URL.createObjectURL(stream);
+				} else {
+					console.warn('Audio stream received, but no remoteAudioElement provided');
+				}
+			}
 		}
 	};
 
@@ -659,6 +724,9 @@
 			console.log('Setting remote description');
 			// Update session streamConfig based on the answer
 			this.streamConfig = new CrocSDK.StreamConfig(new CrocSDK.Sdp.Session(sdp));
+			if (this.streamConfig.video && this.screenStream) {
+				this.streamConfig.video.source = 'screen';
+			}
 			var description = new JsSIP.WebRTC.RTCSessionDescription({
 				type : 'answer',
 				sdp : sdp
@@ -854,6 +922,10 @@
 				self.oldLocalStream.stop();
 				self.oldLocalStream = null;
 			}
+			if (self.oldScreenStream) {
+				self.oldScreenStream.stop();
+				self.oldScreenStream = null;
+			}
 			CrocSDK.Util.fireEvent(self, 'onRenegotiateComplete', {});
 		});
 	};
@@ -956,7 +1028,13 @@
 		// Mute all local streams
 		var videoTracks = this.localStream.getVideoTracks();
 		var audioTracks = this.localStream.getAudioTracks();
-		var allTracks = videoTracks.concat(audioTracks);
+		var screenTracks;
+		if (this.screenStream) {
+			screenTracks = this.screenStream.getVideoTracks();
+		} else {
+			screenTracks = [];
+		}
+		var allTracks = videoTracks.concat(audioTracks, screenTracks);
 		for (var i = 0, len = allTracks.length; i < len; i++) {
 			allTracks[i].enabled = false;
 		}
@@ -996,7 +1074,13 @@
 		// Unmute the local media
 		var videoTracks = this.localStream.getVideoTracks();
 		var audioTracks = this.localStream.getAudioTracks();
-		var allTracks = videoTracks.concat(audioTracks);
+		var screenTracks;
+		if (this.screenStream) {
+			screenTracks = this.screenStream.getVideoTracks();
+		} else {
+			screenTracks = [];
+		}
+		var allTracks = videoTracks.concat(audioTracks, screenTracks);
 		for (var i = 0, len = allTracks.length; i < len; i++) {
 			allTracks[i].enabled = true;
 		}
@@ -1240,6 +1324,10 @@
 
 		if (this.peerConnection) {
 			this.peerConnection.close();
+		}
+
+		if (this.screenStream) {
+			this.screenStream.stop();
 		}
 
 		if (this.localStream) {
