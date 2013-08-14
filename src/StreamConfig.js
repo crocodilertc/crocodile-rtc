@@ -1,6 +1,43 @@
 (function (CrocSDK) {
 	var allowedMediaTypes = [ 'audio', 'video' ];
 
+	/**
+	 * @typedef CrocSDK.MediaAPI~StreamConfig
+	 * @property {CrocSDK.MediaAPI~StreamDirections} audio
+	 * The audio stream configuration. Set to <code>null</code> if there is no
+	 * audio stream in the session.
+	 * @property {CrocSDK.MediaAPI~StreamDirections} video
+	 * The video stream configuration. Set to <code>null</code> if there is no
+	 * video stream in the session.
+	 * @example <caption>Audio-only session</caption>
+	 * {
+	 *   audio: {send: true, receive: true},
+	 *   video: null
+	 * }
+	 * @example <caption>Audio session with screen sharing (Chrome only)</caption>
+	 * {
+	 *   audio: {send: true, receive: true},
+	 *   video: {
+	 *     send: {mandatory: {chromeMediaSource: 'screen'}},
+	 *     receive: false
+	 *   }
+	 * }
+	 */
+
+	/**
+	 * @typedef CrocSDK.MediaAPI~StreamDirections
+	 * @property {Boolean|MediaTrackConstraints} send
+	 * Set to <code>true</code> if the stream is outbound-only or
+	 * bi-directional.
+	 * <p>
+	 * When configuring media streams, advanced applications may provide
+	 * a {@link http://www.w3.org/TR/mediacapture-streams/#idl-def-MediaStreamConstraints MediaTrackConstraints}
+	 * object (as defined by the W3C) to fine-tune the desired properties of the
+	 * media track.
+	 * @property {Boolean} receive
+	 * Set to <code>true</code> if the stream is inbound-only or bi-directional.
+	 */
+
 	CrocSDK.StreamConfig = function (config) {
 		if (config instanceof CrocSDK.Sdp.Session) {
 			this.fromSdp(config);

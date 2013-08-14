@@ -285,24 +285,6 @@
 	 */
 
 	/**
-	 * @typedef CrocSDK.MediaAPI~StreamConfig
-	 * @property {CrocSDK.MediaAPI~StreamDirections} audio The audio stream
-	 * configuration. Set to <code>null</code> if there is no audio stream in
-	 * the session.
-	 * @property {CrocSDK.MediaAPI~StreamDirections} video The video stream
-	 * configuration. Set to <code>null</code> if there is no video stream in
-	 * the session.
-	 */
-
-	/**
-	 * @typedef CrocSDK.MediaAPI~StreamDirections
-	 * @property {Boolean} send Set to <code>true</code> if the stream is
-	 *           outbound-only or bi-directional.
-	 * @property {Boolean} receive Set to <code>true</code> if the stream is
-	 *           inbound-only or bi-directional.
-	 */
-
-	/**
 	 * @typedef CrocSDK.MediaAPI~MediaSessionEvent
 	 * @property {CrocSDK.MediaAPI~MediaSession} session
 	 * The MediaSession object representing the inbound session.

@@ -214,6 +214,8 @@
 		this.peerConnection = new JsSIP.WebRTC.RTCPeerConnection({
 			iceServers : iceServers
 		}, constraints);
+		this.videoConstraints = null;
+		this.audioConstraints = null;
 		this.localStream = null;
 		this.oldLocalStream = null;
 		this.screenStream = null;
@@ -344,8 +346,9 @@
 		var sc = streamConfig || this.streamConfig;
 		var constraints = {
 			audio: !!sc.audio && sc.audio.send,
-			video: !!sc.video && sc.video.send && !sc.video.source
+			video: !!sc.video && sc.video.send
 		};
+		var screencapture = false;
 		var removeOldStream = function() {
 			var oldStream = mediaSession.localStream;
 			if (oldStream) {
@@ -370,27 +373,52 @@
 				mediaSession.localVideoElement.muted = true;
 			}
 
-			mediaSession._getScreenMedia(sc, onSuccess);
+			mediaSession._getScreenMedia(screencapture, onSuccess);
 		};
 		var mediaFailure = function(error) {
 			console.warn('getUserMedia failed:', error);
 			mediaSession.close();
 		};
 
+		// Handle media constraints
+		if (this.audioConstraints &&
+				CrocSDK.Util.isType(constraints.audio, 'boolean')) {
+			// Keep previous constraints
+			constraints.audio = this.audioConstraints;
+		} else if (CrocSDK.Util.isType(constraints.audio, 'object')) {
+			// Save the requested constraints
+			this.audioConstraints = constraints.audio;
+		}
+		if (this.videoConstraints &&
+				CrocSDK.Util.isType(constraints.video, 'boolean')) {
+			// Keep previous constraints
+			constraints.video = this.videoConstraints;
+		} else if (CrocSDK.Util.isType(constraints.video, 'object')) {
+			// Save the requested constraints
+			this.videoConstraints = constraints.video;
+		}
+
+		var v = constraints.video;
+		if (v && v.mandatory && v.mandatory.chromeMediaSource === 'screen') {
+			// Screen capture video is being requested - that's handled in the
+			// next step, as we can't request audio at the same time.
+			constraints.video = false;
+			screencapture = true;
+		}
+
 		if (!constraints.audio && !constraints.video) {
 			removeOldStream();
 
 			// Might want screen media instead
-			this._getScreenMedia(sc, onSuccess);
+			this._getScreenMedia(screencapture, onSuccess);
 			return;
 		}
 
 		JsSIP.WebRTC.getUserMedia(constraints, mediaSuccess, mediaFailure);
 	};
 
-	MediaSession.prototype._getScreenMedia = function(streamConfig, onSuccess) {
+	MediaSession.prototype._getScreenMedia = function(enabled, onSuccess) {
 		var mediaSession = this;
-		var requestMedia = true;
 		var constraints = {
 			audio: false,
 			video: {mandatory: {chromeMediaSource: 'screen'}}
@@ -422,17 +450,15 @@
 			mediaSession.close();
 		};
 
-		var videoConfig = streamConfig.video;
-		if (!videoConfig || !videoConfig.send || videoConfig.source !== 'screen') {
+		if (!enabled) {
 			// Don't want screen sharing
 			removeOldStream();
-			requestMedia = false;
 		} else if (this.screenStream && !this.screenStream.ended) {
-			// We don't need to request media
-			requestMedia = false;
+			// We don't need to request media again
+			enabled = false;
 		}
 
-		if (requestMedia) {
+		if (enabled) {
 			JsSIP.WebRTC.getUserMedia(constraints, mediaSuccess, mediaFailure);
 		} else {
 			// Ensure calling function finishes before calling onSuccess to
