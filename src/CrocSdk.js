@@ -696,6 +696,11 @@ var CrocSDK = {};
 		// Check for apiKey or sipProxySet
 		checkConfig(config);
 
+		// Squash address/username to make it case insensitive in the auth hash
+		if (config.address) {
+			config.address = config.address.toLowerCase();
+		}
+
 		var detectedConfig = {
 			capabilities : detectCapabilities(config),
 			register : !!config.address
