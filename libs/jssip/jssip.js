@@ -7794,7 +7794,9 @@ UA.prototype.loadConfig = function(configuration) {
   }
 
   // Instance-id for GRUU
-  settings.instance_id = JsSIP.Utils.newUUID();
+  if (!settings.instance_id) {
+    settings.instance_id = JsSIP.Utils.newUUID();
+  }
 
   // jssip_id instance parameter. Static random tag of length 5
   settings.jssip_id = JsSIP.Utils.createRandomToken(5);
@@ -7888,7 +7890,6 @@ UA.configuration_skeleton = (function() {
     skeleton = {},
     parameters = [
       // Internal parameters
-      "instance_id",
       "jssip_id",
       "register_min_expires",
       "ws_server_max_reconnection",
@@ -7907,6 +7908,7 @@ UA.configuration_skeleton = (function() {
       "hack_via_tcp", // false.
       "hack_ip_in_contact", //false
       "handle_media", //true
+      "instance_id",
       "no_answer_timeout", // 30 seconds.
       "password",
       "register_expires", // 600 seconds.
@@ -8075,6 +8077,18 @@ UA.configuration_check = {
     handle_media: function(handle_media) {
       if (typeof handle_media === 'boolean') {
         return handle_media;
+      }
+    },
+
+    instance_id: function(instance_id) {
+      if (!(/^uuid?:/.test(instance_id))) {
+        instance_id = 'uuid:' + instance_id;
+      }
+
+      if(JsSIP.Grammar.parse(instance_id, 'uuid_URI') === -1) {
+        return;
+      } else {
+        return instance_id;
       }
     },
 
@@ -10323,7 +10337,12 @@ JsSIP.Grammar = (function(){
         "sub_delims": parse_sub_delims,
         "turn_URI": parse_turn_URI,
         "turn_scheme": parse_turn_scheme,
-        "turn_transport": parse_turn_transport
+        "turn_transport": parse_turn_transport,
+        "uuid_URI": parse_uuid_URI,
+        "uuid": parse_uuid,
+        "hex4": parse_hex4,
+        "hex8": parse_hex8,
+        "hex12": parse_hex12
       };
       
       if (startRule !== undefined) {
@@ -22763,6 +22782,219 @@ JsSIP.Grammar = (function(){
                               data.transport = transport; })(pos0);
         }
         if (result0 === null) {
+          pos = pos0;
+        }
+        return result0;
+      }
+      
+      function parse_uuid_URI() {
+        var result0, result1;
+        var pos0;
+        
+        pos0 = pos;
+        if (input.substr(pos, 5) === "uuid:") {
+          result0 = "uuid:";
+          pos += 5;
+        } else {
+          result0 = null;
+          if (reportFailures === 0) {
+            matchFailed("\"uuid:\"");
+          }
+        }
+        if (result0 !== null) {
+          result1 = parse_uuid();
+          if (result1 !== null) {
+            result0 = [result0, result1];
+          } else {
+            result0 = null;
+            pos = pos0;
+          }
+        } else {
+          result0 = null;
+          pos = pos0;
+        }
+        return result0;
+      }
+      
+      function parse_uuid() {
+        var result0, result1, result2, result3, result4, result5, result6, result7, result8;
+        var pos0, pos1;
+        
+        pos0 = pos;
+        pos1 = pos;
+        result0 = parse_hex8();
+        if (result0 !== null) {
+          if (input.charCodeAt(pos) === 45) {
+            result1 = "-";
+            pos++;
+          } else {
+            result1 = null;
+            if (reportFailures === 0) {
+              matchFailed("\"-\"");
+            }
+          }
+          if (result1 !== null) {
+            result2 = parse_hex4();
+            if (result2 !== null) {
+              if (input.charCodeAt(pos) === 45) {
+                result3 = "-";
+                pos++;
+              } else {
+                result3 = null;
+                if (reportFailures === 0) {
+                  matchFailed("\"-\"");
+                }
+              }
+              if (result3 !== null) {
+                result4 = parse_hex4();
+                if (result4 !== null) {
+                  if (input.charCodeAt(pos) === 45) {
+                    result5 = "-";
+                    pos++;
+                  } else {
+                    result5 = null;
+                    if (reportFailures === 0) {
+                      matchFailed("\"-\"");
+                    }
+                  }
+                  if (result5 !== null) {
+                    result6 = parse_hex4();
+                    if (result6 !== null) {
+                      if (input.charCodeAt(pos) === 45) {
+                        result7 = "-";
+                        pos++;
+                      } else {
+                        result7 = null;
+                        if (reportFailures === 0) {
+                          matchFailed("\"-\"");
+                        }
+                      }
+                      if (result7 !== null) {
+                        result8 = parse_hex12();
+                        if (result8 !== null) {
+                          result0 = [result0, result1, result2, result3, result4, result5, result6, result7, result8];
+                        } else {
+                          result0 = null;
+                          pos = pos1;
+                        }
+                      } else {
+                        result0 = null;
+                        pos = pos1;
+                      }
+                    } else {
+                      result0 = null;
+                      pos = pos1;
+                    }
+                  } else {
+                    result0 = null;
+                    pos = pos1;
+                  }
+                } else {
+                  result0 = null;
+                  pos = pos1;
+                }
+              } else {
+                result0 = null;
+                pos = pos1;
+              }
+            } else {
+              result0 = null;
+              pos = pos1;
+            }
+          } else {
+            result0 = null;
+            pos = pos1;
+          }
+        } else {
+          result0 = null;
+          pos = pos1;
+        }
+        if (result0 !== null) {
+          result0 = (function(offset, uuid) {
+                          data = input.substring(pos+5, offset); })(pos0, result0[0]);
+        }
+        if (result0 === null) {
+          pos = pos0;
+        }
+        return result0;
+      }
+      
+      function parse_hex4() {
+        var result0, result1, result2, result3;
+        var pos0;
+        
+        pos0 = pos;
+        result0 = parse_HEXDIG();
+        if (result0 !== null) {
+          result1 = parse_HEXDIG();
+          if (result1 !== null) {
+            result2 = parse_HEXDIG();
+            if (result2 !== null) {
+              result3 = parse_HEXDIG();
+              if (result3 !== null) {
+                result0 = [result0, result1, result2, result3];
+              } else {
+                result0 = null;
+                pos = pos0;
+              }
+            } else {
+              result0 = null;
+              pos = pos0;
+            }
+          } else {
+            result0 = null;
+            pos = pos0;
+          }
+        } else {
+          result0 = null;
+          pos = pos0;
+        }
+        return result0;
+      }
+      
+      function parse_hex8() {
+        var result0, result1;
+        var pos0;
+        
+        pos0 = pos;
+        result0 = parse_hex4();
+        if (result0 !== null) {
+          result1 = parse_hex4();
+          if (result1 !== null) {
+            result0 = [result0, result1];
+          } else {
+            result0 = null;
+            pos = pos0;
+          }
+        } else {
+          result0 = null;
+          pos = pos0;
+        }
+        return result0;
+      }
+      
+      function parse_hex12() {
+        var result0, result1, result2;
+        var pos0;
+        
+        pos0 = pos;
+        result0 = parse_hex4();
+        if (result0 !== null) {
+          result1 = parse_hex4();
+          if (result1 !== null) {
+            result2 = parse_hex4();
+            if (result2 !== null) {
+              result0 = [result0, result1, result2];
+            } else {
+              result0 = null;
+              pos = pos0;
+            }
+          } else {
+            result0 = null;
+            pos = pos0;
+          }
+        } else {
+          result0 = null;
           pos = pos0;
         }
         return result0;

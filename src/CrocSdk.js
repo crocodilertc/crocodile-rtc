@@ -283,6 +283,13 @@ var CrocSDK = {};
 			sipProxySet[i] = scheme.concat('://', sipProxySet[i], '/', apiKey);
 		}
 
+		// Check for an existing UUID instance id in local storage
+		var instance = localStorage['croc.rtc.sip.instance'];
+		if (!instance) {
+			instance = JsSIP.Utils.newUUID();
+			localStorage['croc.rtc.sip.instance'] = instance;
+		}
+
 		// Configuration object to use for JsSIP user agent
 		var sipConfig = {
 			ws_servers : sipProxySet,
@@ -293,7 +300,8 @@ var CrocSDK = {};
 			authorization_user : croc.authorizationUser,
 			display_name : croc.displayName,
 			no_answer_timeout : croc.acceptTimeout,
-			handle_media : false
+			handle_media : false,
+			instance_id: instance
 		};
 
 		// Create the JsSIP User Agent
