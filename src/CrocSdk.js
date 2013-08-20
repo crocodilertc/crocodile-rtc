@@ -179,24 +179,13 @@ var CrocSDK = {};
 	}
 
 	/**
-	 * Used to test if browser supports method navigator.getUserMedia.
-	 * 
-	 * @private
-	 * @return {Boolean}
-	 */
-	function hasGetUserMedia() {
-		// navigator.getUserMedia() different browser variations
-		return (navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia);
-	}
-
-	/**
-	 * Used to test if browser has the capabilities for audio and video.
+	 * Gets the initial capabilities, based on the croc config.
 	 * 
 	 * @private
 	 * @param config
 	 * @returns {CrocSDK.Croc~Capabilities}
 	 */
-	function detectCapabilities(config) {
+	function initialCapabilities(config) {
 		var cap = {
 			"sip.audio": true,
 			"sip.video": true,
@@ -217,38 +206,9 @@ var CrocSDK = {};
 			cap["sip.data"] = false;
 		}
 
-		if (!hasGetUserMedia()) {
+		if (!JsSIP.WebRTC.getUserMedia) {
 			cap["sip.audio"] = false;
 			cap["sip.video"] = false;
-
-			return cap;
-		}
-
-		var stopStream = function(stream) {
-			stream.stop();
-		};
-		var detectMicrophone = function() {
-			if (cap["sip.audio"]) {
-				JsSIP.WebRTC.getUserMedia({
-					audio: true
-				}, stopStream, function() {
-					cap["sip.audio"] = false;
-				});
-			}
-		};
-
-		if (cap["sip.video"]) {
-			// Request access to webcam to determine whether one is present
-			JsSIP.WebRTC.getUserMedia({
-				video: true,
-				audio: true
-			}, stopStream, function() {
-				cap["sip.video"] = false;
-				// Fall back to microphone check
-				detectMicrophone();
-			});
-		} else {
-			detectMicrophone();
 		}
 
 		return cap;
@@ -706,8 +666,8 @@ var CrocSDK = {};
 			config.address = config.address.toLowerCase();
 		}
 
-		var detectedConfig = {
-			capabilities : detectCapabilities(config),
+		var initialConfig = {
+			capabilities : initialCapabilities(config),
 			register : !!config.address
 		};
 
@@ -715,9 +675,9 @@ var CrocSDK = {};
 		var mergedConfig;
 		if (config.apiKey) {
 			mergedConfig = config.jQuery.extend(true, {}, defaultConfig,
-					crocNetworkDefaultConfig, detectedConfig, config);
+					crocNetworkDefaultConfig, initialConfig, config);
 		} else {
-			mergedConfig = config.jQuery.extend(true, {}, defaultConfig, detectedConfig, config);
+			mergedConfig = config.jQuery.extend(true, {}, defaultConfig, initialConfig, config);
 		}
 		// We don't want to merge the arrays in provided config with arrays in
 		// the default config; override them instead.
@@ -767,6 +727,9 @@ var CrocSDK = {};
 
 		// Merge the apis and config into this Croc object instance
 		config.jQuery.extend(this, mergedConfig, apis);
+
+		// Kick off media capability detection (async)
+		this._detectCapabilties();
 
 		// Initialise JsSIP
 		initJsSip(this);
@@ -861,6 +824,56 @@ var CrocSDK = {};
 		}
 	};
 
+	CrocSDK.Croc.prototype._detectCapabilties = function() {
+		var cap = this.capabilities;
+		var mst = window.MediaStreamTrack;
+
+		if (mst && mst.getSources) {
+			// Check capabilities without requesting access to media
+			var detectedSourceTypes = {
+				audio: false,
+				video: false
+			};
+
+			mst.getSources(function(sources) {
+				for (var idx = 0, len = sources.length; idx < len; idx++) {
+					detectedSourceTypes[sources[idx].kind] = true;
+				}
+
+				cap["sip.audio"] = cap["sip.audio"] && detectedSourceTypes.audio;
+				cap["sip.video"] = cap["sip.video"] && detectedSourceTypes.video;
+			});
+		} else if (JsSIP.WebRTC.getUserMedia) {
+			// Check capabilities by requesting access to media
+			var stopStream = function(stream) {
+				stream.stop();
+			};
+			var detectMicrophone = function() {
+				if (cap["sip.audio"]) {
+					JsSIP.WebRTC.getUserMedia({
+						audio: true
+					}, stopStream, function() {
+						cap["sip.audio"] = false;
+					});
+				}
+			};
+
+			if (cap["sip.video"]) {
+				// Request access to webcam to determine whether one is present
+				JsSIP.WebRTC.getUserMedia({
+					video: true,
+					audio: true
+				}, stopStream, function() {
+					cap["sip.video"] = false;
+					// Fall back to microphone check
+					detectMicrophone();
+				});
+			} else {
+				detectMicrophone();
+			}
+		}
+	};
+
 	// Public methods
 	/**
 	 * Starts the croc object.
@@ -889,7 +902,7 @@ var CrocSDK = {};
 				// Start a graceful disconnect, so we at least try to clean
 				// up properly. We can't wait for responses, so no chance of
 				// ACKs or authorising requests. :-(
-				croc.disconnect();
+				croc.stop();
 				// Force the WS close now, so the WS server at least sees a
 				// Connection Close frame.
 				croc.sipUA.transport.disconnect();
