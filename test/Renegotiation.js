@@ -47,8 +47,8 @@
 		// Give up if the test has hung for too long
 		var hungTimerId = setTimeout(function() {
 			assert.ok(false, 'Aborting hung test');
-			croc1.disconnect();
-			croc2.disconnect();
+			croc1.stop();
+			croc2.stop();
 		}, 30000);
 
 		croc2.media.onMediaSession = function (event) {
@@ -62,8 +62,8 @@
 			session.onClose = function () {
 				assert.ok(true, 'callee onClose event fired');
 				clearTimeout(hungTimerId);
-				croc1.disconnect();
-				croc2.disconnect();
+				croc1.stop();
+				croc2.stop();
 			};
 		};
 
@@ -96,8 +96,8 @@
 		// Give up if the test has hung for too long
 		var hungTimerId = setTimeout(function() {
 			assert.ok(false, 'Aborting hung test');
-			croc1.disconnect();
-			croc2.disconnect();
+			croc1.stop();
+			croc2.stop();
 		}, 40000);
 		var session1, session2;
 
@@ -112,8 +112,8 @@
 			session2.onClose = function () {
 				assert.ok(true, 'callee onClose event fired');
 				clearTimeout(hungTimerId);
-				croc1.disconnect();
-				croc2.disconnect();
+				croc1.stop();
+				croc2.stop();
 			};
 		};
 
@@ -166,8 +166,8 @@
 		// Give up if the test has hung for too long
 		var hungTimerId = setTimeout(function() {
 			assert.ok(false, 'Aborting hung test');
-			croc1.disconnect();
-			croc2.disconnect();
+			croc1.stop();
+			croc2.stop();
 		}, 40000);
 		var requestStreams = new CrocSDK.StreamConfig({
 			audio: {send: true, receive: true},
@@ -213,8 +213,8 @@
 			session.onClose = function () {
 				assert.ok(true, 'callee onClose event fired');
 				clearTimeout(hungTimerId);
-				croc1.disconnect();
-				croc2.disconnect();
+				croc1.stop();
+				croc2.stop();
 			};
 		};
 
@@ -274,8 +274,8 @@
 		// Give up if the test has hung for too long
 		var hungTimerId = setTimeout(function() {
 			assert.ok(false, 'Aborting hung test');
-			croc1.disconnect();
-			croc2.disconnect();
+			croc1.stop();
+			croc2.stop();
 		}, 60000);
 		var requestStreams = new CrocSDK.StreamConfig({
 			audio: {send: true, receive: true},
@@ -309,8 +309,8 @@
 			session2.onClose = function () {
 				assert.ok(true, 'callee onClose event fired');
 				clearTimeout(hungTimerId);
-				croc1.disconnect();
-				croc2.disconnect();
+				croc1.stop();
+				croc2.stop();
 			};
 		};
 
@@ -398,8 +398,8 @@
 		// Give up if the test has hung for too long
 		var hungTimerId = setTimeout(function() {
 			assert.ok(false, 'Aborting hung test');
-			croc1.disconnect();
-			croc2.disconnect();
+			croc1.stop();
+			croc2.stop();
 		}, 60000);
 		var audioOnly = new CrocSDK.StreamConfig({
 			audio: {send: true, receive: true}
@@ -467,8 +467,8 @@
 			session1.onClose = function () {
 				assert.ok(true, 'caller onClose event fired');
 				clearTimeout(hungTimerId);
-				croc1.disconnect();
-				croc2.disconnect();
+				croc1.stop();
+				croc2.stop();
 			};
 
 			session1.onRenegotiateResponse = function (event) {

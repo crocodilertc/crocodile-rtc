@@ -48,8 +48,8 @@
 		// Give up if the test has hung for too long
 		var hungTimerId = setTimeout(function() {
 			assert.ok(false, 'Aborting hung test');
-			croc1.disconnect();
-			croc2.disconnect();
+			croc1.stop();
+			croc2.stop();
 		}, 10000);
 		
 		// Wait for receiver to register before sending the data
@@ -61,8 +61,8 @@
 				onFailure: function () {
 					assert.ok(true, 'TransferProgress.onFailure event fired');
 					clearTimeout(hungTimerId);
-					croc1.disconnect();
-					croc2.disconnect();
+					croc1.stop();
+					croc2.stop();
 				}
 			});
 		});
@@ -75,8 +75,8 @@
 		// Give up if the test has hung for too long
 		var hungTimerId = setTimeout(function() {
 			assert.ok(false, 'Aborting hung test');
-			croc1.disconnect();
-			croc2.disconnect();
+			croc1.stop();
+			croc2.stop();
 		}, 10000);
 		
 		croc2.data.onData = function(event) {
@@ -88,8 +88,8 @@
 			assert.strictEqual(event.data, strData, 'Expected string data');
 
 			clearTimeout(hungTimerId);
-			croc1.disconnect();
-			croc2.disconnect();
+			croc1.stop();
+			croc2.stop();
 		};
 		
 		// Wait for receiver to register before sending the data
@@ -104,8 +104,8 @@
 		var croc2 = $.croc(config2);
 		// Give up if the test has hung for too long
 		setTimeout(function() {
-			croc1.disconnect();
-			croc2.disconnect();
+			croc1.stop();
+			croc2.stop();
 		}, 2000);
 		
 		// Wait for receiver to register before sending the data
@@ -125,8 +125,8 @@
 		// Give up if the test has hung for too long
 		var hungTimerId = setTimeout(function() {
 			assert.ok(false, 'Aborting hung test');
-			croc1.disconnect();
-			croc2.disconnect();
+			croc1.stop();
+			croc2.stop();
 		}, 10000);
 		
 		croc2.data.onData = function (event) {
@@ -144,8 +144,8 @@
 				onSuccess: function () {
 					assert.ok(true, 'TransferProgress.onSuccess event fired');
 					clearTimeout(hungTimerId);
-					croc1.disconnect();
-					croc2.disconnect();
+					croc1.stop();
+					croc2.stop();
 				},
 				onFailure: function () {
 					assert.ok(false, 'TransferProgress.onFailure event should not fire');
@@ -161,8 +161,8 @@
 		// Give up if the test has hung for too long
 		var hungTimerId = setTimeout(function() {
 			assert.ok(false, 'Aborting hung test');
-			croc1.disconnect();
-			croc2.disconnect();
+			croc1.stop();
+			croc2.stop();
 		}, 10000);
 		// Have to specify NS to satisfy equality assertion
 		var strData = '<strong xmlns="http://www.w3.org/1999/xhtml">XMPP test message</strong> ' + new Date();
@@ -177,8 +177,8 @@
 			assert.strictEqual(receivedString, strData, 'Expected string data');
 
 			clearTimeout(hungTimerId);
-			croc1.disconnect();
-			croc2.disconnect();
+			croc1.stop();
+			croc2.stop();
 		};
 		
 		// Wait for receiver to register before sending the data
@@ -194,8 +194,8 @@
 		// Give up if the test has hung for too long
 		var hungTimerId = setTimeout(function() {
 			assert.ok(false, 'Aborting hung test');
-			croc1.disconnect();
-			croc2.disconnect();
+			croc1.stop();
+			croc2.stop();
 			hungTimerId = null;
 		}, 10000);
 		// Have to specify NS to satisfy equality assertion
@@ -233,8 +233,8 @@
 						clearTimeout(hungTimerId);
 						hungTimerId = null;
 					}
-					croc1.disconnect();
-					croc2.disconnect();
+					croc1.stop();
+					croc2.stop();
 				}
 			});
 		});
@@ -247,8 +247,8 @@
 		// Give up if the test has hung for too long
 		var hungTimerId = setTimeout(function() {
 			assert.ok(false, 'Aborting hung test');
-			croc1.disconnect();
-			croc2.disconnect();
+			croc1.stop();
+			croc2.stop();
 			hungTimerId = null;
 		}, 30000);
 		// Have to specify NS to satisfy equality assertion
@@ -300,8 +300,8 @@
 					clearTimeout(hungTimerId);
 					hungTimerId = null;
 				}
-				croc1.disconnect();
-				croc2.disconnect();
+				croc1.stop();
+				croc2.stop();
 			};
 		});
 		// QUnit will restart once the second croc object has disconnected

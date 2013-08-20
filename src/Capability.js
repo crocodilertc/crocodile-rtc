@@ -526,6 +526,11 @@
 						capabilities: watchData.capabilities
 					});
 				}
+
+				if (CrocSDK.Util.isAuthFailure(response.status_code)) {
+					console.log('Request authentication failed - stopping');
+					capabilityApi.crocObject.stop();
+				}
 			},
 			onRequestTimeout : function() {
 				console.log("request timeout");
@@ -572,6 +577,12 @@
 					status: watchData.status,
 					capabilities: watchData.capabilities
 				});
+
+				// Auth failures should trigger croc object to stop
+				if (CrocSDK.Util.isAuthFailure(response.status_code)) {
+					console.log('Request authentication failed - stopping');
+					capabilityApi.crocObject.stop();
+				}
 			},
 			onRequestTimeout : function() {
 				console.log("request timeout");

@@ -266,5 +266,10 @@
 		}
 	};
 
+	Util.isAuthFailure = function(status_code) {
+		var codes = JsSIP.C.SIP_ERROR_CAUSES.AUTHENTICATION_ERROR;
+		return codes.indexOf(status_code) >= 0;
+	};
+
 	CrocSDK.Util = Util;
 }(CrocSDK));

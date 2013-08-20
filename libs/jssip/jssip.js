@@ -564,6 +564,16 @@ Transport.prototype = {
       console.log(LOG_PREFIX +'closing WebSocket ' + this.server.ws_uri);
       this.ws.close();
     }
+
+    if (this.reconnectTimer !== null) {
+      window.clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+      this.ua.emit('disconnected', this.ua, {
+        transport: this,
+        code: this.lastTransportError.code,
+        reason: this.lastTransportError.reason
+      });
+    }
   },
 
   /**
@@ -619,7 +629,12 @@ Transport.prototype = {
 
     console.log(LOG_PREFIX +'WebSocket ' + this.server.ws_uri + ' connected');
     // Clear reconnectTimer since we are not disconnected
-    window.clearTimeout(this.reconnectTimer);
+    if (this.reconnectTimer !== null) {
+      window.clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    // Reset reconnection_attempts
+    this.reconnection_attempts = 0;
     // Disable closed
     this.closed = false;
     // Trigger onTransportConnected callback
@@ -646,8 +661,6 @@ Transport.prototype = {
       this.ua.onTransportClosed(this);
       // Check whether the user requested to close.
       if(!this.closed) {
-        // Reset reconnection_attempts
-        this.reconnection_attempts = 0;
         this.reConnect();
       } else {
         this.ua.emit('disconnected', this.ua, {
@@ -761,7 +774,9 @@ Transport.prototype = {
       console.log(LOG_PREFIX +'trying to reconnect to WebSocket ' + this.server.ws_uri + ' (reconnection attempt ' + this.reconnection_attempts + ')');
 
       this.reconnectTimer = window.setTimeout(function() {
-        transport.connect();}, this.ua.configuration.ws_server_reconnection_timeout * 1000);
+        transport.connect();
+        transport.reconnectTimer = null;
+      }, this.ua.configuration.ws_server_reconnection_timeout * 1000);
     }
   }
 };
@@ -1937,6 +1952,15 @@ var NonInviteClientTransactionPrototype = function() {
     window.clearTimeout(this.F);
     window.clearTimeout(this.K);
     delete this.request_sender.ua.transactions.nict[this.id];
+
+    switch (this.state) {
+    case C.STATUS_COMPLETED:
+    case C.STATUS_TERMINATED:
+      // We already processed a response, so don't need to notify the sender
+      return;
+    }
+
+    // Notify the sender of the bad news
     this.request_sender.onTransportError();
   };
 
@@ -2013,6 +2037,16 @@ var InviteClientTransactionPrototype = function() {
     window.clearTimeout(this.D);
     window.clearTimeout(this.M);
     delete this.request_sender.ua.transactions.ict[this.id];
+
+    switch (this.state) {
+    case C.STATUS_ACCEPTED:
+    case C.STATUS_COMPLETED:
+    case C.STATUS_TERMINATED:
+      // We already processed a response, so don't need to notify the sender
+      return;
+    }
+
+    // Notify the sender of the bad news
     this.request_sender.onTransportError();
   };
 
@@ -3140,7 +3174,7 @@ Registrator = function(ua, transport) {
 
   if(reg_id) {
     this.contact += ';reg-id='+ reg_id;
-    this.contact += ';+sip.instance="<urn:uuid:'+ this.ua.configuration.instance_id+'>"';
+    this.contact += ';+sip.instance="<urn:'+ this.ua.configuration.instance_id+'>"';
   }
 };
 
@@ -5097,7 +5131,8 @@ var Refer           = /**
    * <code>false</code> otherwise.
    */
   Refer.prototype.receiveNotify = function(request) {
-    var eventHeader, stateHeader, typeHeader, parsed, sessionEvent, extraHeaders,
+    var eventHeader, stateHeader, typeHeader, parsed, sessionEvent,
+      extraHeaders, sipfrag,
       finalNotify = false;
 
     if (this.direction !== 'outgoing' ||
@@ -5128,7 +5163,14 @@ var Refer           = /**
       return false;
     }
 
-    parsed = JsSIP.Parser.parseMessage(request.body, true);
+    sipfrag = request.body;
+    if (!/\r\n$/.test(sipfrag)) {
+      // Strictly this is an invalid sipfrag, but fudge it by appending the
+      // expected end-line characters.
+      sipfrag += '\r\n';
+    }
+
+    parsed = JsSIP.Parser.parseMessage(sipfrag, true);
     if (!parsed || !parsed instanceof JsSIP.IncomingResponse) {
       request.reply(400, 'Bad Message Body');
       this.close();
@@ -7795,7 +7837,7 @@ UA.prototype.loadConfig = function(configuration) {
 
   // Instance-id for GRUU
   if (!settings.instance_id) {
-    settings.instance_id = JsSIP.Utils.newUUID();
+    settings.instance_id = 'uuid:' + JsSIP.Utils.newUUID();
   }
 
   // jssip_id instance parameter. Static random tag of length 5
@@ -9755,7 +9797,8 @@ JsSIP.WebRTC = WebRTC;
    * @param {IncomingRequest} request
    */
   Refer.prototype.receiveNotify = function(request) {
-    var eventHeader, stateHeader, typeHeader, parsed, sessionEvent, extraHeaders,
+    var eventHeader, stateHeader, typeHeader, parsed, sessionEvent,
+      extraHeaders, sipfrag,
       finalNotify = false;
 
     if (this.direction !== 'outgoing' ||
@@ -9786,7 +9829,14 @@ JsSIP.WebRTC = WebRTC;
       return;
     }
 
-    parsed = JsSIP.Parser.parseMessage(request.body, true);
+    sipfrag = request.body;
+    if (!/\r\n$/.test(sipfrag)) {
+      // Strictly this is an invalid sipfrag, but fudge it by appending the
+      // expected end-line characters.
+      sipfrag += '\r\n';
+    }
+
+    parsed = JsSIP.Parser.parseMessage(sipfrag, true);
     if (!parsed || !parsed instanceof JsSIP.IncomingResponse) {
       request.reply(400, 'Bad Message Body');
       this.close();

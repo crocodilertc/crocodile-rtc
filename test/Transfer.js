@@ -63,9 +63,9 @@
 		// Give up if the test has hung for too long
 		var hungTimerId = setTimeout(function() {
 			assert.ok(false, 'Aborting hung test');
-			croc1.disconnect();
-			croc2.disconnect();
-			croc3.disconnect();
+			croc1.stop();
+			croc2.stop();
+			croc3.stop();
 			hungTimerId = null;
 		}, 90000);
 
@@ -146,9 +146,9 @@
 						clearTimeout(hungTimerId);
 						hungTimerId = null;
 					}
-					croc1.disconnect();
-					croc2.disconnect();
-					croc3.disconnect();
+					croc1.stop();
+					croc2.stop();
+					croc3.stop();
 				};
 			};
 
@@ -166,8 +166,8 @@
 		// Give up if the test has hung for too long
 		var hungTimerId = setTimeout(function() {
 			assert.ok(false, 'Aborting hung test');
-			croc1.disconnect();
-			croc2.disconnect();
+			croc1.stop();
+			croc2.stop();
 			hungTimerId = null;
 		}, 60000);
 
@@ -186,8 +186,8 @@
 					clearTimeout(hungTimerId);
 					hungTimerId = null;
 				}
-				croc1.disconnect();
-				croc2.disconnect();
+				croc1.stop();
+				croc2.stop();
 			};
 
 			// Accept the session
@@ -227,8 +227,8 @@
 		// Give up if the test has hung for too long
 		var hungTimerId = setTimeout(function() {
 			assert.ok(false, 'Aborting hung test');
-			croc1.disconnect();
-			croc2.disconnect();
+			croc1.stop();
+			croc2.stop();
 			hungTimerId = null;
 		}, 60000);
 
@@ -283,8 +283,8 @@
 					clearTimeout(hungTimerId);
 					hungTimerId = null;
 				}
-				croc1.disconnect();
-				croc2.disconnect();
+				croc1.stop();
+				croc2.stop();
 			};
 		};
 
@@ -303,9 +303,9 @@
 		// Give up if the test has hung for too long
 		var hungTimerId = setTimeout(function() {
 			assert.ok(false, 'Aborting hung test');
-			croc1.disconnect();
-			croc2.disconnect();
-			croc3.disconnect();
+			croc1.stop();
+			croc2.stop();
+			croc3.stop();
 			hungTimerId = null;
 		}, 90000);
 
@@ -395,9 +395,9 @@
 						clearTimeout(hungTimerId);
 						hungTimerId = null;
 					}
-					croc1.disconnect();
-					croc2.disconnect();
-					croc3.disconnect();
+					croc1.stop();
+					croc2.stop();
+					croc3.stop();
 				};
 			};
 
@@ -416,9 +416,9 @@
 		// Give up if the test has hung for too long
 		var hungTimerId = setTimeout(function() {
 			assert.ok(false, 'Aborting hung test');
-			croc1.disconnect();
-			croc2.disconnect();
-			croc3.disconnect();
+			croc1.stop();
+			croc2.stop();
+			croc3.stop();
 			hungTimerId = null;
 		}, 90000);
 
@@ -498,9 +498,9 @@
 					clearTimeout(hungTimerId);
 					hungTimerId = null;
 				}
-				croc1.disconnect();
-				croc2.disconnect();
-				croc3.disconnect();
+				croc1.stop();
+				croc2.stop();
+				croc3.stop();
 			};
 		};
 
@@ -514,9 +514,9 @@
 		// Give up if the test has hung for too long
 		var hungTimerId = setTimeout(function() {
 			assert.ok(false, 'Aborting hung test');
-			croc1.disconnect();
-			croc2.disconnect();
-			croc3.disconnect();
+			croc1.stop();
+			croc2.stop();
+			croc3.stop();
 			hungTimerId = null;
 		}, 90000);
 
@@ -597,9 +597,9 @@
 						clearTimeout(hungTimerId);
 						hungTimerId = null;
 					}
-					croc1.disconnect();
-					croc2.disconnect();
-					croc3.disconnect();
+					croc1.stop();
+					croc2.stop();
+					croc3.stop();
 				};
 			};
 
@@ -617,8 +617,8 @@
 		// Give up if the test has hung for too long
 		var hungTimerId = setTimeout(function() {
 			assert.ok(false, 'Aborting hung test');
-			croc1.disconnect();
-			croc2.disconnect();
+			croc1.stop();
+			croc2.stop();
 			hungTimerId = null;
 		}, 60000);
 
@@ -673,8 +673,8 @@
 					clearTimeout(hungTimerId);
 					hungTimerId = null;
 				}
-				croc1.disconnect();
-				croc2.disconnect();
+				croc1.stop();
+				croc2.stop();
 			};
 		};
 
@@ -693,9 +693,9 @@
 		// Give up if the test has hung for too long
 		var hungTimerId = setTimeout(function() {
 			assert.ok(false, 'Aborting hung test');
-			croc1.disconnect();
-			croc2.disconnect();
-			croc3.disconnect();
+			croc1.stop();
+			croc2.stop();
+			croc3.stop();
 			hungTimerId = null;
 		}, 90000);
 
@@ -785,9 +785,9 @@
 						clearTimeout(hungTimerId);
 						hungTimerId = null;
 					}
-					croc1.disconnect();
-					croc2.disconnect();
-					croc3.disconnect();
+					croc1.stop();
+					croc2.stop();
+					croc3.stop();
 				};
 			};
 
@@ -806,9 +806,9 @@
 		// Give up if the test has hung for too long
 		var hungTimerId = setTimeout(function() {
 			assert.ok(false, 'Aborting hung test');
-			croc1.disconnect();
-			croc2.disconnect();
-			croc3.disconnect();
+			croc1.stop();
+			croc2.stop();
+			croc3.stop();
 			hungTimerId = null;
 		}, 90000);
 
@@ -888,9 +888,9 @@
 					clearTimeout(hungTimerId);
 					hungTimerId = null;
 				}
-				croc1.disconnect();
-				croc2.disconnect();
-				croc3.disconnect();
+				croc1.stop();
+				croc2.stop();
+				croc3.stop();
 			};
 		};
 

@@ -62,8 +62,8 @@
 		var croc2 = $.croc(config2);
 		// Give up if the test has hung for too long
 		setTimeout(function() {
-			croc1.disconnect();
-			croc2.disconnect();
+			croc1.stop();
+			croc2.stop();
 		}, 5000);
 
 		// Wait for receiver to register before sending the data
@@ -89,8 +89,8 @@
 //		// Give up if the test has hung for too long
 //		var hungTimerId = setTimeout(function() {
 //			assert.ok(false, 'Aborting hung test');
-//			croc1.disconnect();
-//			croc2.disconnect();
+//			croc1.stop();
+//			croc2.stop();
 //		}, 10000);
 //
 //		// Wait for receiver to register before sending the data
@@ -112,8 +112,8 @@
 //			session.onClose = function () {
 //				assert.ok(true, 'DataSession.onClose event fired');
 //				clearTimeout(hungTimerId);
-//				croc1.disconnect();
-//				croc2.disconnect();
+//				croc1.stop();
+//				croc2.stop();
 //			};
 //		});
 //
@@ -131,8 +131,8 @@
 		// Give up if the test has hung for too long
 		var hungTimerId = setTimeout(function() {
 			assert.ok(false, 'Aborting hung test');
-			croc1.disconnect();
-			croc2.disconnect();
+			croc1.stop();
+			croc2.stop();
 		}, 10000);
 
 		// Can't use underscore in header names, as JsSIP converts to dash
@@ -229,8 +229,8 @@
 			session.onClose = function () {
 				assert.ok(true, 'DataSession.onClose event fired');
 				clearTimeout(hungTimerId);
-				croc1.disconnect();
-				croc2.disconnect();
+				croc1.stop();
+				croc2.stop();
 			};
 		});
 
@@ -243,8 +243,8 @@
 		// Give up if the test has hung for too long
 		var hungTimerId = setTimeout(function() {
 			assert.ok(false, 'Aborting hung test');
-			croc1.disconnect();
-			croc2.disconnect();
+			croc1.stop();
+			croc2.stop();
 		}, 10000);
 
 		// Set up the receiver's event handlers
@@ -304,8 +304,8 @@
 			session.onClose = function () {
 				assert.ok(true, 'DataSession.onClose event fired');
 				clearTimeout(hungTimerId);
-				croc1.disconnect();
-				croc2.disconnect();
+				croc1.stop();
+				croc2.stop();
 			};
 		});
 
@@ -320,8 +320,8 @@
 		// Give up if the test has hung for too long
 		var hungTimerId = setTimeout(function() {
 			assert.ok(false, 'Aborting hung test');
-			croc1.disconnect();
-			croc2.disconnect();
+			croc1.stop();
+			croc2.stop();
 		}, 10000);
 
 		for (var i = 0; i < uint8view.length; i++) {
@@ -379,8 +379,8 @@
 			session.onClose = function () {
 				assert.ok(true, 'DataSession.onClose event fired');
 				clearTimeout(hungTimerId);
-				croc1.disconnect();
-				croc2.disconnect();
+				croc1.stop();
+				croc2.stop();
 			};
 		});
 
@@ -395,8 +395,8 @@
 		// Give up if the test has hung for too long
 		var hungTimerId = setTimeout(function() {
 			assert.ok(false, 'Aborting hung test');
-			croc1.disconnect();
-			croc2.disconnect();
+			croc1.stop();
+			croc2.stop();
 		}, 10000);
 
 		for (var i = 0; i < uint16view.length; i++) {
@@ -463,8 +463,8 @@
 			session.onClose = function () {
 				assert.ok(true, 'DataSession.onClose event fired');
 				clearTimeout(hungTimerId);
-				croc1.disconnect();
-				croc2.disconnect();
+				croc1.stop();
+				croc2.stop();
 			};
 		});
 
@@ -478,8 +478,8 @@
 		// Give up if the test has hung for too long
 		var hungTimerId = setTimeout(function() {
 			assert.ok(false, 'Aborting hung test');
-			croc1.disconnect();
-			croc2.disconnect();
+			croc1.stop();
+			croc2.stop();
 		}, 10000);
 
 		// Setup event handlers for croc2 (receiver - sender)
@@ -540,8 +540,8 @@
 					croc2Session.onClose = function () {
 						assert.ok(true, 'DataSession.onClose event fired');
 						clearTimeout(hungTimerId);
-						croc1.disconnect();
-						croc2.disconnect();
+						croc1.stop();
+						croc2.stop();
 					};					
 				},
 				onFailure: function () {
@@ -565,8 +565,8 @@
 		// Give up if the test has hung for too long
 		var hungTimerId = setTimeout(function() {
 			assert.ok(false, 'Aborting hung test');
-			croc1.disconnect();
-			croc2.disconnect();
+			croc1.stop();
+			croc2.stop();
 		}, 10000);
 
 		// Set up the receiver's event handlers
@@ -647,8 +647,8 @@
 			session.onClose = function () {
 				assert.ok(true, 'DataSession.onClose event fired');
 				clearTimeout(hungTimerId);
-				croc1.disconnect();
-				croc2.disconnect();
+				croc1.stop();
+				croc2.stop();
 			};
 		});
 	});
@@ -659,8 +659,8 @@
 		// Give up if the test has hung for too long
 		var hungTimerId = setTimeout(function() {
 			assert.ok(false, 'Aborting hung test');
-			croc1.disconnect();
-			croc2.disconnect();
+			croc1.stop();
+			croc2.stop();
 		}, 10000);
 
 		// Set up the receiver's event handlers
@@ -707,8 +707,8 @@
 					sessionreuse.onClose = function () {
 						assert.ok(true, 'DataSession.onClose event fired');
 						clearTimeout(hungTimerId);
-						croc1.disconnect();
-						croc2.disconnect();
+						croc1.stop();
+						croc2.stop();
 					};
 				},
 				onFailure: function () {
@@ -729,9 +729,9 @@
 		// Give up if the test has hung for too long
 		var hungTimerId = setTimeout(function() {
 			assert.ok(false, 'Aborting hung test');
-			croc1.disconnect();
-			croc3.disconnect();
-			croc2.disconnect();
+			croc1.stop();
+			croc3.stop();
+			croc2.stop();
 		}, 10000);
 
 		// Set up the receiver's event handlers
@@ -792,9 +792,9 @@
 					session2.onClose = function () {
 						assert.ok(true, 'session2 DataSession.onClose event fired');
 						clearTimeout(hungTimerId);
-						croc1.disconnect();
-						croc3.disconnect();
-						croc2.disconnect();
+						croc1.stop();
+						croc3.stop();
+						croc2.stop();
 					};
 				},
 				onFailure: function () {
@@ -814,8 +814,8 @@
 		// Give up if the test has hung for too long
 		var hungTimerId = setTimeout(function() {
 			assert.ok(false, 'Aborting hung test');
-			croc1.disconnect();
-			croc2.disconnect();
+			croc1.stop();
+			croc2.stop();
 		}, 10000);
 
 		// Can't use underscore in header names, as JsSIP converts to dash
@@ -885,8 +885,8 @@
 					session2.onClose = function () {
 						assert.ok(true, 'session2 DataSession.onClose event fired');
 						clearTimeout(hungTimerId);
-						croc1.disconnect();
-						croc2.disconnect();
+						croc1.stop();
+						croc2.stop();
 					};
 				},
 				onFailure: function () {
@@ -908,8 +908,8 @@
 		// Give up if the test has hung for too long
 		var hungTimerId = setTimeout(function() {
 			assert.ok(false, 'Aborting hung test');
-			croc1.disconnect();
-			croc2.disconnect();
+			croc1.stop();
+			croc2.stop();
 		}, 10000);
 
 		var fileTransferParams = {
@@ -989,8 +989,8 @@
 					session2.onClose = function () {
 						assert.ok(true, 'session2 DataSession.onClose event fired');
 						clearTimeout(hungTimerId);
-						croc1.disconnect();
-						croc2.disconnect();
+						croc1.stop();
+						croc2.stop();
 					};
 				},
 				onFailure: function () {
@@ -1011,8 +1011,8 @@
 		var croc2 = $.croc(config2);
 		// Give up if the test has hung for too long
 		setTimeout(function() {
-			croc1.disconnect();
-			croc2.disconnect();
+			croc1.stop();
+			croc2.stop();
 		}, 4000);
 
 		// Setup event handlers for croc2 (receiver - sender)
@@ -1040,8 +1040,8 @@
 		var croc2Session = null;
 		// Give up if the test has hung for too long
 		setTimeout(function() {
-			croc1.disconnect();
-			croc2.disconnect();
+			croc1.stop();
+			croc2.stop();
 		}, 4000);
 
 		// Setup event handlers for croc2 (receiver - sender)
@@ -1082,8 +1082,8 @@
 		// Give up if the test has hung for too long
 		var hungTimerId = setTimeout(function() {
 			assert.ok(false, 'Aborting hung test');
-			croc1.disconnect();
-			croc2.disconnect();
+			croc1.stop();
+			croc2.stop();
 		}, 15000);
 
 		croc1.data.idleTimeout = 5;
@@ -1116,8 +1116,8 @@
 			session.onClose = function () {
 				assert.ok(true, 'DataSession.onClose event fired via idle session close');
 				clearTimeout(hungTimerId);
-				croc1.disconnect();
-				croc2.disconnect();
+				croc1.stop();
+				croc2.stop();
 			};
 
 		});
@@ -1130,8 +1130,8 @@
 		// Give up if the test has hung for too long
 		var hungTimerId = setTimeout(function() {
 			assert.ok(false, 'Aborting hung test');
-			croc1.disconnect();
-			croc2.disconnect();
+			croc1.stop();
+			croc2.stop();
 		}, 30000);
 		var numNotifications = 0;
 		var idleTimerId = null;
@@ -1180,8 +1180,8 @@
 					clearTimeout(hungTimerId);
 					hungTimerId = null;
 				}
-				croc1.disconnect();
-				croc2.disconnect();
+				croc1.stop();
+				croc2.stop();
 			};
 		});
 
@@ -1194,8 +1194,8 @@
 		// Give up if the test has hung for too long
 		var hungTimerId = setTimeout(function() {
 			assert.ok(false, 'Aborting hung test');
-			croc1.disconnect();
-			croc2.disconnect();
+			croc1.stop();
+			croc2.stop();
 		}, 10000);
 		// Have to specify NS to satisfy equality assertion
 		var strData = '<strong xmlns="http://www.w3.org/1999/xhtml">XMPP test message</strong> ' + new Date();
@@ -1246,8 +1246,8 @@
 					clearTimeout(hungTimerId);
 					hungTimerId = null;
 				}
-				croc1.disconnect();
-				croc2.disconnect();
+				croc1.stop();
+				croc2.stop();
 			};
 		});
 
@@ -1260,8 +1260,8 @@
 		// Give up if the test has hung for too long
 		var hungTimerId = setTimeout(function() {
 			assert.ok(false, 'Aborting hung test');
-			croc1a.disconnect();
-			croc1b.disconnect();
+			croc1a.stop();
+			croc1b.stop();
 		}, 10000);
 
 		// Configure the QUnit restart
@@ -1326,8 +1326,8 @@
 			session.onClose = function () {
 				assert.ok(true, 'DataSession.onClose event fired');
 				clearTimeout(hungTimerId);
-				croc1a.disconnect();
-				croc1b.disconnect();
+				croc1a.stop();
+				croc1b.stop();
 			};
 		};
 

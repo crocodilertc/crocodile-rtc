@@ -48,8 +48,8 @@
 		// Give up if the test has hung for too long
 		var hungTimerId = setTimeout(function() {
 			assert.ok(false, 'Aborting hung test');
-			croc1.disconnect();
-			croc2.disconnect();
+			croc1.stop();
+			croc2.stop();
 		}, sessionExpires * 4 * 1000);
 		var lastRefresh = 0;
 		var numUpdates = 0;
@@ -109,8 +109,8 @@
 			session.onClose = function () {
 				assert.ok(true, 'caller onClose event fired');
 				clearTimeout(hungTimerId);
-				croc1.disconnect();
-				croc2.disconnect();
+				croc1.stop();
+				croc2.stop();
 			};
 		};
 
@@ -124,8 +124,8 @@
 		// Give up if the test has hung for too long
 		var hungTimerId = setTimeout(function() {
 			assert.ok(false, 'Aborting hung test');
-			croc1.disconnect();
-			croc2.disconnect();
+			croc1.stop();
+			croc2.stop();
 		}, sessionExpires * 2 * 1000);
 		var lastRefresh = 0;
 
@@ -166,8 +166,8 @@
 				var errorPercentage = Math.abs(elapsedMillis - expectedExpiry) * 100 / expectedExpiry;
 				assert.ok(errorPercentage < 5, 'bye sent at expected time: ' + errorPercentage);
 				clearTimeout(hungTimerId);
-				croc1.disconnect();
-				croc2.disconnect();
+				croc1.stop();
+				croc2.stop();
 			};
 
 			// Accept the session
@@ -195,8 +195,8 @@
 		// Give up if the test has hung for too long
 		var hungTimerId = setTimeout(function() {
 			assert.ok(false, 'Aborting hung test');
-			croc1.disconnect();
-			croc2.disconnect();
+			croc1.stop();
+			croc2.stop();
 		}, sessionExpires * 3 * 1000);
 		var lastRefresh = 0;
 
@@ -265,8 +265,8 @@
 			session.onClose = function () {
 				assert.ok(true, 'caller onClose event fired');
 				clearTimeout(hungTimerId);
-				croc1.disconnect();
-				croc2.disconnect();
+				croc1.stop();
+				croc2.stop();
 			};
 		};
 
@@ -280,8 +280,8 @@
 		// Give up if the test has hung for too long
 		var hungTimerId = setTimeout(function() {
 			assert.ok(false, 'Aborting hung test');
-			croc1.disconnect();
-			croc2.disconnect();
+			croc1.stop();
+			croc2.stop();
 		}, sessionExpires * 4 * 1000);
 		var lastRefresh = 0;
 		var numRefreshes = 0;
@@ -339,8 +339,8 @@
 			session.onClose = function () {
 				assert.ok(true, 'caller onClose event fired');
 				clearTimeout(hungTimerId);
-				croc1.disconnect();
-				croc2.disconnect();
+				croc1.stop();
+				croc2.stop();
 			};
 		};
 

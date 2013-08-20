@@ -11,6 +11,7 @@ var CrocSDK = {};
 	// Default Croc object configuration
 	var defaultConfig = {
 		acceptTimeout : 300,
+		autostart: true,
 		capabilities : {},
 		capability : {
 			refreshPeriod : 15
@@ -22,7 +23,6 @@ var CrocSDK = {};
 		features: ['audio', 'video', 'pagedata'],
 		register : false,
 		requireMatchingVersion : false,
-		start: true,
 		useTLS : true,
 		iceServers : [ {
 			url : 'stun:stun.l.google.com:19302'
@@ -42,6 +42,7 @@ var CrocSDK = {};
 		address : [ 'string' ],
 		apiKey : [ 'string' ],
 		authorizationUser : [ 'string' ],
+		autostart : [ 'boolean' ],
 		capabilities : [ 'object' ],
 		capability : [ 'object' ],
 		data : [ 'object' ],
@@ -64,7 +65,6 @@ var CrocSDK = {};
 		register : [ 'boolean' ],
 		requireMatchingVersion : [ 'boolean' ],
 		sipProxySet : [ 'string', 'string[]' ],
-		start : [ 'boolean' ],
 		turnManagerUrl : [ 'string' ],
 		turnManagerUsername : [ 'string' ],
 		useTLS : [ 'boolean' ],
@@ -310,15 +310,11 @@ var CrocSDK = {};
 		// Handle events for JsSIP
 		croc.sipUA.on('connected', function() {
 			/**
-			 * <p>
-			 * Dispatched when the Crocodile RTC JavaScript Library has
-			 * successfully connected to the network.
-			 * </p>
-			 * 
+			 * Dispatched when the croc object has successfully connected to the
+			 * network.
 			 * <p>
 			 * No action is taken when this event occurs if the event handler is
 			 * not defined.
-			 * </p>
 			 * 
 			 * @event CrocSDK.Croc#onConnected
 			 * @param {CrocSDK.Croc~ConnectedEvent} event
@@ -328,15 +324,11 @@ var CrocSDK = {};
 		});
 		croc.sipUA.on('disconnected', function(event) {
 			/**
+			 * Dispatched when the croc object has disconnected from the
+			 * network, or a connection attempt has failed.
 			 * <p>
-			 * Dispatched when the Crocodile RTC JavaScript Library has
-			 * disconnected from the network.
-			 * </p>
-			 * 
-			 * <p>
-			 * No action is taken when this event occurs if the event handler is
-			 * not defined.
-			 * </p>
+			 * The croc object will automatically attempt to re-establish
+			 * dropped connections as long as it is still running.
 			 * 
 			 * @event CrocSDK.Croc#onDisconnected
 			 * @param {CrocSDK.Croc~DisconnectedEvent} event
@@ -348,15 +340,8 @@ var CrocSDK = {};
 		});
 		croc.sipUA.on('registered', function(event) {
 			/**
-			 * <p>
-			 * Dispatched when the Crocodile RTC JavaScript Library has
-			 * registered to the network.
-			 * </p>
-			 * 
-			 * <p>
-			 * No action is taken when this event occurs if the event handler is
-			 * not defined.
-			 * </p>
+			 * Dispatched when the croc object has successfully registered on
+			 * the network.
 			 * 
 			 * @event CrocSDK.Croc#onRegistered
 			 * @param {CrocSDK.Croc~RegisteredEvent} event
@@ -379,47 +364,50 @@ var CrocSDK = {};
 				instanceAddresses: gruus
 			});
 		});
-		croc.sipUA.on('unregistered', function() {
+		croc.sipUA.on('unregistered', function(event) {
 			/**
+			 * Dispatched when the croc object has unregistered from the
+			 * network, or a periodic re-register attempt has failed.
 			 * <p>
-			 * Dispatched when the Crocodile RTC JavaScript Library has
-			 * unregistered from the network.
-			 * </p>
-			 * 
-			 * <p>
-			 * No action is taken when this event occurs if the event handler is
-			 * not defined.
-			 * </p>
+			 * If registration fails due to an authentication error, the croc
+			 * object will automatically stop; no further connection attempts
+			 * will be made.
 			 * 
 			 * @event CrocSDK.Croc#onUnregistered
 			 * @param {CrocSDK.Croc~UnregisteredEvent} event
 			 * The event object associated with this event.
 			 */
 			CrocSDK.Util.fireEvent(croc, 'onUnregistered', {});
+
+			// Auth failures should trigger croc object to stop
+			switch (event.data.cause) {
+			case JsSIP.C.causes.AUTHENTICATION_ERROR:
+			case JsSIP.C.causes.REJECTED:
+				console.log('Registration authentication failed - stopping');
+				croc.stop();
+				break;
+			}
 		});
 		croc.sipUA.on('registrationFailed', function(event) {
 			var cause = 'other';
-			var causes = JsSIP.C.causes;
 
 			switch (event.data.cause) {
-			case causes.REQUEST_TIMEOUT:
+			case JsSIP.C.causes.REQUEST_TIMEOUT:
 				cause = 'timeout';
 				break;
-			case causes.AUTHENTICATION_ERROR:
+			case JsSIP.C.causes.AUTHENTICATION_ERROR:
+			case JsSIP.C.causes.REJECTED:
 				cause = 'auth';
 				break;
 			}
 
 			/**
+			 * Dispatched when the croc object has failed to register on the
+			 * network.
 			 * <p>
-			 * Dispatched when the Crocodile RTC JavaScript Library has
-			 * failed to register to the network.
-			 * </p>
-			 * 
-			 * <p>
-			 * No action is taken when this event occurs if the event handler is
-			 * not defined.
-			 * </p>
+			 * If registration fails due to an authentication error, the croc
+			 * object will automatically stop; no further connection attempts
+			 * will be made.
 			 * 
 			 * @event CrocSDK.Croc#onRegistrationFailed
 			 * @param {CrocSDK.Croc~RegistrationFailedEvent} event
@@ -428,6 +416,15 @@ var CrocSDK = {};
 			CrocSDK.Util.fireEvent(croc, 'onRegistrationFailed', {
 				cause : cause
 			});
+
+			// Auth failures should trigger croc object to stop
+			switch (event.data.cause) {
+			case JsSIP.C.causes.AUTHENTICATION_ERROR:
+			case JsSIP.C.causes.REJECTED:
+				console.log('Registration authentication failed - stopping');
+				croc.stop();
+				break;
+			}
 		});
 
 		// We've customised the newRTCSession event behaviour so that we can
@@ -858,27 +855,25 @@ var CrocSDK = {};
 		this.media.init();
 		this.presence.init();
 
-		if (this.start) {
+		if (this.autostart) {
 			// Start a connection to the service
-			this.connect();
+			this.start();
 		}
 	};
 
 	// Public methods
 	/**
+	 * Starts the croc object.
 	 * <p>
-	 * Connects to the real-time communications network (Crocodile RTC Network
-	 * by default). The connection process is started automatically when the
-	 * Crocodile RTC JavaScript Library object is constructed; this method
-	 * should only be explicitly called to reconnect after
-	 * <code>disconnect()</code> has been used.
-	 * </p>
-	 * 
+	 * This will create the connection to the network, and retry failed
+	 * connections, until the croc object is stopped.
 	 * <p>
-	 * Exceptions: {@link CrocSDK.Exceptions#ValueError ValueError}
-	 * </p>
+	 * By default, the croc object automatically starts when it is constructed,
+	 * so this method does not need to be called.
+	 * <p>
+	 * This method replaces the deprecated <code>connect</code> method.
 	 */
-	CrocSDK.Croc.prototype.connect = function() {
+	CrocSDK.Croc.prototype.start = function() {
 		// Start a connection using JsSIP
 		if (!this.started) {
 			var croc = this;
@@ -919,17 +914,29 @@ var CrocSDK = {};
 	};
 
 	/**
-	 * <p>
-	 * Disconnects from the network. Crocodile RTC JavaScript Library will
-	 * automatically disconnect when the browser tab is closed. This method will
-	 * be rarely be explicitly used.
-	 * </p>
-	 * 
-	 * <p>
-	 * Exceptions: <i>none</i>
-	 * </p>
+	 * Synonym for the {@link CrocSDK.Croc#start start} method.
+	 * @deprecated
 	 */
-	CrocSDK.Croc.prototype.disconnect = function() {
+	CrocSDK.Croc.prototype.connect = function() {
+		this.start();
+	};
+
+	/**
+	 * Stops the croc object.
+	 * <p>
+	 * This will close any outstanding sessions, unregister from the network
+	 * network, and disconnect any WebSockets. No further connection attempts
+	 * will be made unless the croc object is started again.
+	 * <p>
+	 * The library registers a <code>beforeunload</code> handler which should
+	 * call this method automatically if the user closes or navigates away from
+	 * the current page. Where possible, it is preferable to call this method
+	 * at an earlier stage, so these actions have more time to complete
+	 * successfully.
+	 * <p>
+	 * This method replaces the deprecated <code>disconnect</code> method.
+	 */
+	CrocSDK.Croc.prototype.stop = function() {
 		// Stop a connection using JsSIP
 		if (this.started) {
 			this.started = false;
@@ -953,14 +960,16 @@ var CrocSDK = {};
 	};
 
 	/**
-	 * <p>
+	 * Synonym for the {@link CrocSDK.Croc#stop stop} method.
+	 * @deprecated
+	 */
+	CrocSDK.Croc.prototype.disconnect = function() {
+		this.stop();
+	};
+
+	/**
 	 * Returns <code>true</code> if the Crocodile RTC JavaScript Library
 	 * object is connected to the network.
-	 * </p>
-	 * 
-	 * <p>
-	 * Exceptions: <i>none</i>
-	 * </p>
 	 * 
 	 * @returns Boolean
 	 */
@@ -970,21 +979,13 @@ var CrocSDK = {};
 	};
 
 	/**
-	 * <p>
 	 * Explicitly registers the Crocodile RTC JavaScript Library object with the
 	 * network. If the <code>register</code> property is set to
-	 * <code>true</code> the object will be automatically registered during
-	 * <code>connect()</code>.
-	 * </p>
-	 * 
+	 * <code>true</code>, the object will be automatically registered when the
+	 * croc object starts.
 	 * <p>
 	 * The Crocodile RTC JavaScript Library object must be registered with the
 	 * network to receive inbound out-of-session requests.
-	 * </p>
-	 * 
-	 * <p>
-	 * Exceptions: {@link CrocSDK.Exceptions#ValueError ValueError}
-	 * </p>
 	 */
 	CrocSDK.Croc.prototype.reregister = function() {
 		// Register to a service using JsSIP
@@ -992,21 +993,11 @@ var CrocSDK = {};
 	};
 
 	/**
-	 * <p>
 	 * Explicitly un-registers the Crocodile RTC JavaScript Library object from
-	 * the network. If the <code>register</code> property is set to
-	 * <code>true</code> the object will be automatically un-registered during
-	 * <code>disconnect()</code>.
-	 * </p>
-	 * 
+	 * the network.
 	 * <p>
 	 * The Crocodile RTC JavaScript Library object must be registered with the
 	 * network to receive inbound out-of-session requests.
-	 * </p>
-	 * 
-	 * <p>
-	 * Exceptions: <i>none</i>
-	 * </p>
 	 */
 	CrocSDK.Croc.prototype.unregister = function() {
 		// Unregister from a service using JsSIP
@@ -1133,7 +1124,7 @@ var CrocSDK = {};
 	 * currently registered on the network as this user. If the user is not
 	 * logged in on any other clients, the array will be empty.
 	 * <p>
-	 * The unique addresses can be used to target a request at specific client
+	 * The instance addresses can be used to target a request at specific client
 	 * instance.  Currently they can be used with the following:
 	 * <ul>
 	 * <li>Capabilities requests (using the

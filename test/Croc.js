@@ -100,7 +100,7 @@
 				onConnected: function() {
 					assert.ok(true, 'onConnected fired');
 					clearTimeout(hungTimerId);
-					this.disconnect();
+					this.stop();
 				},
 				onDisconnected: function() {
 					assert.ok(true, 'onDisconnected fired');
@@ -112,7 +112,7 @@
 		// Give up if the test has hung for too long
 		var hungTimerId = setTimeout(function() {
 			assert.ok(false, 'Aborting hung test');
-			croc.disconnect();
+			croc.stop();
 		}, 10000);
 
 		// Wait for the UA to disconnect before moving on to other tests
@@ -125,20 +125,20 @@
 				password: testUsers[0].password,
 				register: false,
 				onConnected: function() {
-					croc.disconnect();
+					croc.stop();
 				}
 		};
 		var croc = $.croc(config);
 		// Give up if the test has hung for too long
 		var hungTimerId = setTimeout(function() {
 			assert.ok(false, 'Aborting hung test');
-			croc.disconnect();
+			croc.stop();
 		}, 10000);
 		
 		setTimeout(function() {
 			croc.onConnected = function() {
 				assert.ok(true, 'onConnected fired');
-				croc.disconnect();
+				croc.stop();
 			};
 			croc.onDisconnected = function() {
 				clearTimeout(hungTimerId);
@@ -146,6 +146,39 @@
 				QUnit.start();
 			};
 			croc.connect();
+		}, 2000);
+		
+		// Wait for the UA to disconnect before moving on to other tests
+	});
+
+	QUnit.asyncTest("User defined start and stop", 2, function(assert) {
+		var config = {
+				apiKey: testApiKey,
+				address: testUsers[0].address,
+				password: testUsers[0].password,
+				register: false,
+				onConnected: function() {
+					croc.stop();
+				}
+		};
+		var croc = $.croc(config);
+		// Give up if the test has hung for too long
+		var hungTimerId = setTimeout(function() {
+			assert.ok(false, 'Aborting hung test');
+			croc.stop();
+		}, 10000);
+		
+		setTimeout(function() {
+			croc.onConnected = function() {
+				assert.ok(true, 'onConnected fired');
+				croc.stop();
+			};
+			croc.onDisconnected = function() {
+				clearTimeout(hungTimerId);
+				assert.ok(true, 'onDisconnected fired');
+				QUnit.start();
+			};
+			croc.start();
 		}, 2000);
 		
 		// Wait for the UA to disconnect before moving on to other tests
@@ -162,7 +195,7 @@
 					var connected = croc.isConnected();
 					assert.strictEqual(connected, true, "expected return value of isConnected()");
 					clearTimeout(hungTimerId);
-					croc.disconnect();
+					croc.stop();
 				},
 				onDisconnected: function() {
 					var connected = croc.isConnected();
@@ -175,7 +208,7 @@
 		// Give up if the test has hung for too long
 		var hungTimerId = setTimeout(function() {
 			assert.ok(false, 'Aborting hung test');
-			croc.disconnect();
+			croc.stop();
 		}, 10000);
 		
 		// Wait for the UA to disconnect before moving on to other tests
@@ -202,7 +235,7 @@
 				onUnregistered: function() {
 					assert.ok(true, 'unregistered to network');
 					clearTimeout(hungTimerId);
-					croc.disconnect();
+					croc.stop();
 				},
 				onDisconnected: function() {
 					assert.ok(true, 'onDisconnected fired');
@@ -213,7 +246,75 @@
 		// Give up if the test has hung for too long
 		var hungTimerId = setTimeout(function() {
 			assert.ok(false, 'Aborting hung test');
-			croc.disconnect();
+			croc.stop();
+		}, 10000);
+
+		// Wait for the UA to disconnect before moving on to other tests
+	});
+	
+	QUnit.asyncTest("Invalid username", 3, function(assert) {
+		var config = {
+				apiKey: testApiKey,
+				address: 'invalid' + testUsers[0].address,
+				password: testUsers[0].password,
+				onConnected: function() {
+					assert.ok(true, 'onConnected fired');
+				},
+				onRegistered: function() {
+					assert.ok(false, 'registered to network');
+				},
+				onRegistrationFailed: function() {
+					assert.ok(true, 'registration failed');
+				},
+				onDisconnected: function() {
+					assert.ok(true, 'onDisconnected fired');
+					if (hungTimerId !== null) {
+						clearTimeout(hungTimerId);
+						hungTimerId = null;
+					}
+					QUnit.start();
+				}
+		};
+		var croc = $.croc(config);
+		// Give up if the test has hung for too long
+		var hungTimerId = setTimeout(function() {
+			assert.ok(false, 'Aborting hung test');
+			croc.stop();
+			hungTimerId = null;
+		}, 10000);
+
+		// Wait for the UA to disconnect before moving on to other tests
+	});
+	
+	QUnit.asyncTest("Invalid password", 3, function(assert) {
+		var config = {
+				apiKey: testApiKey,
+				address: testUsers[0].address,
+				password: testUsers[0].password + '1',
+				onConnected: function() {
+					assert.ok(true, 'onConnected fired');
+				},
+				onRegistered: function() {
+					assert.ok(false, 'registered to network');
+				},
+				onRegistrationFailed: function() {
+					assert.ok(true, 'registration failed');
+				},
+				onDisconnected: function() {
+					assert.ok(true, 'onDisconnected fired');
+					if (hungTimerId !== null) {
+						clearTimeout(hungTimerId);
+						hungTimerId = null;
+					}
+					QUnit.start();
+				}
+		};
+		var croc = $.croc(config);
+		// Give up if the test has hung for too long
+		var hungTimerId = setTimeout(function() {
+			assert.ok(false, 'Aborting hung test');
+			croc.stop();
+			hungTimerId = null;
 		}, 10000);
 
 		// Wait for the UA to disconnect before moving on to other tests

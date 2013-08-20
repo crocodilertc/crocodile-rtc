@@ -52,8 +52,8 @@
 //		// Give up if the test has hung for too long
 //		var hungTimerId = setTimeout(function() {
 //			assert.ok(false, 'Aborting hung test');
-//			croc1.disconnect();
-//			croc2.disconnect();
+//			croc1.stop();
+//			croc2.stop();
 //		}, 30000);
 //
 //		// Wait for receiver to register before sending the data
@@ -68,8 +68,8 @@
 //			session.onClose = function () {
 //				assert.ok(true, 'MediaSession.onClose event fired');
 //				clearTimeout(hungTimerId);
-//				croc1.disconnect();
-//				croc2.disconnect();
+//				croc1.stop();
+//				croc2.stop();
 //			};
 //		});
 //
@@ -82,8 +82,8 @@
 		// Give up if the test has hung for too long
 		var hungTimerId = setTimeout(function() {
 			assert.ok(false, 'Aborting hung test');
-			croc1.disconnect();
-			croc2.disconnect();
+			croc1.stop();
+			croc2.stop();
 		}, 60000);
 		var defaultStreams = new CrocSDK.StreamConfig({
 			audio: {send: true, receive: true}
@@ -147,8 +147,8 @@
 			session.onClose = function () {
 				assert.ok(true, 'caller onClose event fired');
 				clearTimeout(hungTimerId);
-				croc1.disconnect();
-				croc2.disconnect();
+				croc1.stop();
+				croc2.stop();
 			};
 		};
 
@@ -161,8 +161,8 @@
 		// Give up if the test has hung for too long
 		var hungTimerId = setTimeout(function() {
 			assert.ok(false, 'Aborting hung test');
-			croc1.disconnect();
-			croc2.disconnect();
+			croc1.stop();
+			croc2.stop();
 		}, 60000);
 		var callerStreams = new CrocSDK.StreamConfig({
 			audio: {send: true, receive: false}
@@ -217,8 +217,8 @@
 			session.onClose = function () {
 				assert.ok(true, 'MediaSession.onClose event fired');
 				clearTimeout(hungTimerId);
-				croc1.disconnect();
-				croc2.disconnect();
+				croc1.stop();
+				croc2.stop();
 			};
 		};
 
@@ -231,8 +231,8 @@
 		// Give up if the test has hung for too long
 		var hungTimerId = setTimeout(function() {
 			assert.ok(false, 'Aborting hung test');
-			croc1.disconnect();
-			croc2.disconnect();
+			croc1.stop();
+			croc2.stop();
 		}, 60000);
 		var callerStreams = new CrocSDK.StreamConfig({
 			audio: {send: false, receive: true}
@@ -290,8 +290,8 @@
 			session.onClose = function () {
 				assert.ok(true, 'MediaSession.onClose event fired');
 				clearTimeout(hungTimerId);
-				croc1.disconnect();
-				croc2.disconnect();
+				croc1.stop();
+				croc2.stop();
 			};
 		};
 
@@ -304,8 +304,8 @@
 		// Give up if the test has hung for too long
 		var hungTimerId = setTimeout(function() {
 			assert.ok(false, 'Aborting hung test');
-			croc1.disconnect();
-			croc2.disconnect();
+			croc1.stop();
+			croc2.stop();
 		}, 60000);
 		var requestStreams = new CrocSDK.StreamConfig({
 			audio: {send: true, receive: true},
@@ -364,8 +364,8 @@
 			session.onClose = function () {
 				assert.ok(true, 'MediaSession.onClose event fired');
 				clearTimeout(hungTimerId);
-				croc1.disconnect();
-				croc2.disconnect();
+				croc1.stop();
+				croc2.stop();
 			};
 		};
 
@@ -376,13 +376,15 @@
 		var croc1 = $.croc(config1);
 		var croc2 = $.croc(config2);
 		delete croc2.onDisconnected;
+		// Must remove UUID from local storage for fork tests
+		localStorage.clear();
 		var croc3 = $.croc(config2);
 		// Give up if the test has hung for too long
 		var hungTimerId = setTimeout(function() {
 			assert.ok(false, 'Aborting hung test');
-			croc1.disconnect();
-			croc2.disconnect();
-			croc3.disconnect();
+			croc1.stop();
+			croc2.stop();
+			croc3.stop();
 		}, 60000);
 		var defaultStreams = new CrocSDK.StreamConfig({
 			audio: {send: true, receive: true}
@@ -472,9 +474,9 @@
 				// Wait a couple of seconds before calling disconnect to avoid
 				// confusing the source of the BYE requests.
 				setTimeout(function () {
-					croc1.disconnect();
-					croc2.disconnect();
-					croc3.disconnect();
+					croc1.stop();
+					croc2.stop();
+					croc3.stop();
 				}, 2000);
 			};
 		};

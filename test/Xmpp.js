@@ -25,7 +25,7 @@
 		address: testUsers[0].address,
 		password: testUsers[0].password,
 		displayName: 'Unit Tester #1',
-		start: false,
+		autostart: false,
 		xmppResource : 'unittest'
 	};
 	var config2 = {
@@ -33,7 +33,7 @@
 		address: testUsers[1].address,
 		password: testUsers[1].password,
 		displayName: 'Unit Tester #2',
-		start: false,
+		autostart: false,
 		xmppResource : 'unittest'
 	};
 	

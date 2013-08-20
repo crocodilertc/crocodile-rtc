@@ -1064,6 +1064,10 @@
 					});
 					// Clean up and notify application
 					dataSession.close(status);
+					// Auth failures should trigger croc object to stop
+					if (event.data.cause === JsSIP.C.causes.AUTHENTICATION_ERROR) {
+						crocObject.stop();
+					}
 				}
 			};
 

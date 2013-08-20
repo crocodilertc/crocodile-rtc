@@ -71,8 +71,8 @@
 
 		// Give up if the test has hung for too long
 		setTimeout(function() {
-			croc1.disconnect();
-			croc2.disconnect();
+			croc1.stop();
+			croc2.stop();
 		}, 5000);
 	});
 
@@ -102,8 +102,8 @@
 
 		// Give up if the test has hung for too long
 		setTimeout(function() {
-			croc1.disconnect();
-			croc2.disconnect();
+			croc1.stop();
+			croc2.stop();
 		}, 5000);
 	});
 
@@ -133,8 +133,8 @@
 
 		// Give up if the test has hung for too long
 		setTimeout(function() {
-			croc1.disconnect();
-			croc2.disconnect();
+			croc1.stop();
+			croc2.stop();
 		}, 5000);
 	});
 
@@ -173,8 +173,8 @@
 
 		// Give up if the test has hung for too long
 		setTimeout(function() {
-			croc1.disconnect();
-			croc2.disconnect();
+			croc1.stop();
+			croc2.stop();
 		}, 8000);
 	});
 
@@ -203,9 +203,9 @@
 
 		// Give up if the test has hung for too long
 		setTimeout(function() {
-			croc1.disconnect();
-			croc3.disconnect();
-			croc2.disconnect();
+			croc1.stop();
+			croc3.stop();
+			croc2.stop();
 		}, 5000);
 	});
 
@@ -242,9 +242,9 @@
 
 		// Give up if the test has hung for too long
 		setTimeout(function() {
-			croc1.disconnect();
-			croc3.disconnect();
-			croc2.disconnect();
+			croc1.stop();
+			croc3.stop();
+			croc2.stop();
 		}, 6000);
 	});
 
@@ -299,8 +299,8 @@
 
 		// Give up if the test has hung for too long
 		setTimeout(function() {
-			croc1.disconnect();
-			croc2.disconnect();
+			croc1.stop();
+			croc2.stop();
 		}, 12000);
 	});
 
@@ -317,8 +317,8 @@
 
 		// Give up if the test has hung for too long
 		setTimeout(function() {
-			croc1.disconnect();
-			croc2.disconnect();
+			croc1.stop();
+			croc2.stop();
 		}, 5000);
 	});
 
@@ -335,8 +335,8 @@
 
 		// Give up if the test has hung for too long
 		setTimeout(function() {
-			croc1.disconnect();
-			croc2.disconnect();
+			croc1.stop();
+			croc2.stop();
 		}, 5000);
 	});
 
@@ -363,8 +363,8 @@
 
 		// Give up if the test has hung for too long
 		setTimeout(function() {
-			croc1.disconnect();
-			croc2.disconnect();
+			croc1.stop();
+			croc2.stop();
 		}, 14000);
 	});
 
@@ -374,8 +374,8 @@
 		// Give up if the test has hung for too long
 		var hungTimerId = setTimeout(function() {
 			assert.ok(false, 'Aborting hung test');
-			croc1.disconnect();
-			croc2.disconnect();
+			croc1.stop();
+			croc2.stop();
 		}, 5000);
 
 		croc2.capabilities["sip.audio"] = "invalid";
@@ -398,8 +398,8 @@
 				assert.strictEqual(croc2.capabilities["custom.test"], 1, "new capability added");
 				assert.strictEqual(croc1.capability.watchDataCache[config2.address].capabilities["custom.test"], undefined, "Capability not added to cache as expected");
 				clearTimeout(hungTimerId);
-				croc1.disconnect();
-				croc2.disconnect();
+				croc1.stop();
+				croc2.stop();
 			}, 2000);
 		});
 	});
@@ -427,14 +427,16 @@
 
 		// Give up if the test has hung for too long
 		setTimeout(function() {
-			croc1.disconnect();
-			croc2.disconnect();
+			croc1.stop();
+			croc2.stop();
 		}, 8000);
 	});
 
 	QUnit.asyncTest("Inter-instance capabilities", 10, function(assert) {
 		// Start two instances for the same user
 		var croc1a = $.croc(config1);
+		// Must remove UUID from local storage for multiple-instance tests
+		localStorage.clear();
 		var croc1b = $.croc(config1);
 		// Give up if the test has hung for too long
 		var hungTimerId = setTimeout(function() {
@@ -443,8 +445,8 @@
 			}
 
 			assert.ok(false, 'Aborting hung test');
-			croc1a.disconnect();
-			croc1b.disconnect();
+			croc1a.stop();
+			croc1b.stop();
 			hungTimerId = null;
 		}, 10000);
 
@@ -477,8 +479,8 @@
 				assert.strictEqual(caps['custom.string'], 'foobar', 'Extra capability added');
 
 				// We're done
-				croc1a.disconnect();
-				croc1b.disconnect();
+				croc1a.stop();
+				croc1b.stop();
 				if (hungTimerId !== null) {
 					clearTimeout(hungTimerId);
 					hungTimerId = null;

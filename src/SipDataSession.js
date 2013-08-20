@@ -139,9 +139,16 @@
 		if (config.onSuccess) {
 			options.eventHandlers.succeeded = config.onSuccess.bind(dataApi);
 		}
-		if (config.onFailure) {
-			options.eventHandlers.failed = config.onFailure.bind(dataApi);
-		}
+		options.eventHandlers.failed = function(event) {
+			if (config.onFailure) {
+				config.onFailure.call(dataApi);
+			}
+
+			// Auth failures should trigger croc object to stop
+			if (event.data.cause === JsSIP.C.causes.AUTHENTICATION_ERROR) {
+				dataApi.crocObject.stop();
+			}
+		};
 
 		dataApi.crocObject.sipUA.sendMessage(this.address, data, options);
 		this.lastActivity = Date.now();

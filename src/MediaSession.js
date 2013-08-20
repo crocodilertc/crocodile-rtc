@@ -15,6 +15,11 @@
 			var mLine = parsedSdp.media[index];
 			var config = streamConfig[mLine.media];
 
+			if (mLine.media === 'application') {
+				// Don't modify the DataChannel stream
+				continue;
+			}
+
 			if (!config) {
 				// Don't want this stream at all
 				mLine.port = 0;
@@ -329,6 +334,10 @@
 			mediaSession.sipSession = null;
 			// Clean up everything else, then notify app
 			mediaSession.close(status);
+			// Auth failures should trigger croc object to stop
+			if (event.data.cause === JsSIP.C.causes.AUTHENTICATION_ERROR) {
+				croc.stop();
+			}
 		});
 		sipSession.on('reinvite', this._handleReinvite.bind(this));
 		sipSession.on('refresh', this._handleRefresh.bind(this));
