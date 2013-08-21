@@ -623,6 +623,8 @@
 			return;
 		}
 
+		this.currentPresence = createPresence(croc);
+
 		// Set up JSJaC event handlers
 		con.registerHandler('onconnect', function () {
 			// Retrieve the roster to flag us as an interested party (receive
@@ -884,7 +886,6 @@
 			CrocSDK.Util.fireEvent(contact, 'onNotify', {});
 		} else if (bareFrom === this.crocObject.address) {
 			// It's us - fire onSelfNotify
-			this.currentPresence = request;
 			CrocSDK.Util.fireEvent(this, 'onSelfNotify', {
 				instanceAddress: from.toString(),
 				uniqueAddress: from.toString(),		// Deprecated
@@ -893,9 +894,11 @@
 				extraNodes: extraNodes
 			});
 
-			if (availability === 'unavailable' && this.disconnectTimerId) {
-				clearTimeout(this.disconnectTimerId);
-				this.crocObject.xmppCon.disconnect();
+			if (from.getResource() === this.crocObject.xmppResource) {
+				if (availability === 'unavailable' && this.disconnectTimerId) {
+					clearTimeout(this.disconnectTimerId);
+					this.crocObject.xmppCon.disconnect();
+				}
 			}
 		} else {
 			// Some other user, must be directed presence
@@ -1064,8 +1067,8 @@
 			throw new CrocSDK.Exceptions.StateError('Presence not started');
 		}
 
-		var presence = createPresence(this.crocObject, info);
-		this.crocObject.xmppCon.send(presence);
+		this.currentPresence = createPresence(this.crocObject, info);
+		this.crocObject.xmppCon.send(this.currentPresence);
 	};
 
 	/**
