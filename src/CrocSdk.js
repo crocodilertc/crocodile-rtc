@@ -489,7 +489,7 @@ var CrocSDK = {};
 		}
 	};
 	EphemeralCredentialsManager.prototype.stop = function() {
-		if (this.timerId) {
+		if (this.timerId !== null) {
 			clearTimeout(this.timerId);
 			this.timerId = null;
 		}
@@ -504,17 +504,24 @@ var CrocSDK = {};
 			queryParams.username = this.username;
 		}
 
+		if (this.timerId !== null) {
+			clearTimeout(this.timerId);
+			this.timerId = null;
+		}
+
 		this.jQuery.getJSON(this.url, queryParams).done(function(response) {
 			var nextAttemptDelay = Math.max(response.ttl - 5, 60);
 
 			console.log('Next credential refresh in', nextAttemptDelay, 'seconds');
 			manager.timerId = setTimeout(function() {
+				manager.timerId = null;
 				manager.query();
 			}, nextAttemptDelay * 1000);
 			CrocSDK.Util.fireEvent(manager, 'onUpdate', response);
 		}).fail(function(jqxhr, textStatus, error) {
 			console.warn('Ephemeral credential request failed:', textStatus, error);
 			manager.timerId = setTimeout(function() {
+				manager.timerId = null;
 				manager.query();
 			}, manager.retryPeriod * 1000);
 		});
@@ -729,7 +736,7 @@ var CrocSDK = {};
 		config.jQuery.extend(this, mergedConfig, apis);
 
 		// Kick off media capability detection (async)
-		this._detectCapabilties();
+		this._detectCapabilities();
 
 		// Initialise JsSIP
 		initJsSip(this);
@@ -824,7 +831,7 @@ var CrocSDK = {};
 		}
 	};
 
-	CrocSDK.Croc.prototype._detectCapabilties = function() {
+	CrocSDK.Croc.prototype._detectCapabilities = function() {
 		var cap = this.capabilities;
 		var mst = window.MediaStreamTrack;
 
