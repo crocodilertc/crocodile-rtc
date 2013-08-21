@@ -1,6 +1,6 @@
 (function (CrocSDK) {
 
-	CrocSDK.XmppDataSession = function (dataApi, address) {
+	CrocSDK.XmppDataSession = function (dataApi, address, instanceAddress) {
 		var self = this;
 		// Internal state
 		this.dataApi = dataApi;
@@ -26,7 +26,7 @@
 
 		// Public properties
 		this.address = address;
-		this.instanceAddress = null;
+		this.instanceAddress = instanceAddress || null;
 		this.displayName = null;
 		this.customHeaders = null;
 		this.capabilities = null;
@@ -36,10 +36,6 @@
 	/*
 	 * Internal methods
 	 */
-
-	CrocSDK.XmppDataSession.prototype._setInstanceAddress = function (instanceAddress) {
-		this.instanceAddress = instanceAddress;
-	};
 
 	/**
 	 * Processes an incoming message for this session.
@@ -75,6 +71,9 @@
 				bodyChild = nextSibling;
 			}
 
+			// "Lock in" on full JID (see RFC 6121 section 5.1)
+			this.instanceAddress = message.getFrom();
+
 			CrocSDK.Util.fireEvent(this, 'onXHTMLReceived', {
 				address: this.address,
 				instanceAddress: this.instanceAddress,
@@ -82,6 +81,9 @@
 				body: df
 			}, true);
 		} else if (body) {
+			// "Lock in" on full JID (see RFC 6121 section 5.1)
+			this.instanceAddress = message.getFrom();
+
 			// Just use the plain text body
 			CrocSDK.Util.fireEvent(this, 'onData', {
 				address: this.address,

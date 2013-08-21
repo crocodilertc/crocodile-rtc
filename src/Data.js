@@ -495,14 +495,9 @@
 		var address = message.getFromJID().getBareJID();
 		var dataSession = this.xmppDataSessions[address];
 
-		if (dataSession && dataSession.getState() !== 'closed') {
-			// Existing data session
-			// "Lock in" on full JID (see RFC 6121 section 5.1)
-			dataSession._setInstanceAddress(instanceAddress);
-		} else {
+		if (!dataSession || dataSession.getState() === 'closed') {
 			// Create a new data session
-			dataSession = new CrocSDK.XmppDataSession(this, address);
-			dataSession._setInstanceAddress(instanceAddress);
+			dataSession = new CrocSDK.XmppDataSession(this, address, instanceAddress);
 			this.xmppDataSessions[address] = dataSession;
 
 			if (!this.checkSessionsIntervalId) {
