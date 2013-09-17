@@ -708,6 +708,12 @@ var CrocSDK = {};
 		var apis = {
 			/**
 			 * @memberof CrocSDK.Croc
+			 * @type CrocSDK.AccountAPI
+			 * @instance
+			 */
+			account : new CrocSDK.AccountAPI(this),
+			/**
+			 * @memberof CrocSDK.Croc
 			 * @type CrocSDK.CapabilityAPI
 			 * @instance
 			 */

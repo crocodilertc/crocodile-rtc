@@ -38,6 +38,7 @@ module.exports = function(grunt) {
           'libs/crocodile-msrp/crocodile-msrp.js',
           'libs/jsjac/jsjac.uncompressed.js',
           'src/CrocSdk.js',
+          'src/Account.js',
           'src/Capability.js',
           'src/Constants.js',
           'src/CustomHeaders.js',
