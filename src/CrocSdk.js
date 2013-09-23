@@ -482,13 +482,16 @@ var CrocSDK = {};
 		this.username = username;
 		this.retryPeriod = retryPeriod;
 		this.timerId = null;
+		this.running = false;
 	}
 	EphemeralCredentialsManager.prototype.start = function() {
+		this.running = true;
 		if (this.url && !this.timerId) {
 			this.query();
 		}
 	};
 	EphemeralCredentialsManager.prototype.stop = function() {
+		this.running = false;
 		if (this.timerId !== null) {
 			clearTimeout(this.timerId);
 			this.timerId = null;
@@ -510,6 +513,11 @@ var CrocSDK = {};
 		}
 
 		this.jQuery.getJSON(this.url, queryParams).done(function(response) {
+			if (!manager.running) {
+				// We were stopped in the meanwhile
+				return;
+			}
+
 			var nextAttemptDelay = Math.max(response.ttl - 5, 60);
 
 			console.log('Next credential refresh in', nextAttemptDelay, 'seconds');
@@ -519,6 +527,11 @@ var CrocSDK = {};
 			}, nextAttemptDelay * 1000);
 			CrocSDK.Util.fireEvent(manager, 'onUpdate', response);
 		}).fail(function(jqxhr, textStatus, error) {
+			if (!manager.running) {
+				// Stop trying
+				return;
+			}
+
 			console.warn('Ephemeral credential request failed:', textStatus, error);
 			manager.timerId = setTimeout(function() {
 				manager.timerId = null;
@@ -550,27 +563,35 @@ var CrocSDK = {};
 		this.password = password;
 		this.retryPeriod = retryPeriod || 60;
 		this.timerId = null;
+		this.running = false;
 	}
 	RestAuthManager.prototype.start = function() {
+		this.running = true;
 		if (!this.timerId) {
 			this.auth();
 		}
 	};
 	RestAuthManager.prototype.stop = function() {
+		this.running = false;
 		if (this.timerId) {
 			clearTimeout(this.timerId);
 			this.timerId = null;
 		}
 	};
 	RestAuthManager.prototype.auth = function() {
-		var auth = this;
+		var self = this;
 		var md5 = JsSIP.Utils.calculateMD5;
 		var handleFail = function(jqxhr, textStatus, error) {
-			console.warn('Auth nonce request failed:', textStatus, error);
+			if (!self.running) {
+				// Stop trying
+				return;
+			}
 
-			auth.timerId = setTimeout(function() {
-				auth.auth();
-			}, auth.retryPeriod * 1000);
+			console.warn('Auth request failed:', textStatus, error);
+
+			self.timerId = setTimeout(function() {
+				self.auth();
+			}, self.retryPeriod * 1000);
 		};
 
 		// Get the challenge
@@ -579,11 +600,16 @@ var CrocSDK = {};
 			cache : false
 		}).done(
 				function(json) {
+					if (!self.running) {
+						// We were stopped in the meanwhile
+						return;
+					}
+
 					var nc = '00000001';
 					var cnonce = CrocSDK.Util.randomAlphanumericString(10);
-					var ha1 = md5(auth.username.concat(':', json.realm, ':',
-							auth.password));
-					var ha2 = md5('POST:' + auth.path);
+					var ha1 = md5(self.username.concat(':', json.realm, ':',
+							self.password));
+					var ha2 = md5('POST:' + self.path);
 					var response = md5(ha1.concat(':', json.nonce, ':', nc,
 							':', cnonce, ':auth:', ha2));
 
@@ -593,18 +619,18 @@ var CrocSDK = {};
 					}
 
 					var data = {
-						username : auth.username,
+						username : self.username,
 						realm : json.realm,
 						nonce : json.nonce,
 						cnonce : cnonce,
 						nc : nc,
 						qop : json.qop,
-						uri : auth.path,
+						uri : self.path,
 						response : response
 					};
 
 					// Send our response
-					auth.jQuery.ajax(this.url, {
+					self.jQuery.ajax(this.url, {
 						type : 'POST',
 						dataType : 'json',
 						data : JSON.stringify(data),
@@ -612,10 +638,15 @@ var CrocSDK = {};
 						xhrFields: {withCredentials: true}
 					}).done(
 							function(json) {
+								if (!self.running) {
+									// We were stopped in the meanwhile
+									return;
+								}
+
 								var nextAuth = Math.max(json.ttl - 5,
-										auth.retryPeriod);
-								auth.timerId = setTimeout(function() {
-									auth.auth();
+										self.retryPeriod);
+								self.timerId = setTimeout(function() {
+									self.auth();
 								}, nextAuth * 1000);
 								console.log('Next auth refresh in', nextAuth,
 										'seconds');
