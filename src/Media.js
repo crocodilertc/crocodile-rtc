@@ -219,6 +219,7 @@
 		var capabilityApi = crocObject.capability;
 		var sipSession = new JsSIP.RTCSession(crocObject.sipUA);
 		var watchData = capabilityApi.getWatchData(address);
+		var enableDtls = false;
 
 		if (!connectConfig) {
 			connectConfig = {};
@@ -231,15 +232,24 @@
 		if (watchData) {
 			if (/Chrome/.test(navigator.userAgent) &&
 					/Firefox/.test(watchData.userAgent)) {
-				if (!constraints) {
-					constraints = {};
-				}
-				if (!constraints.optional) {
-					constraints.optional = [];
-				}
-				constraints.optional.push({DtlsSrtpKeyAgreement: true});
-				console.log('Enabling DTLS for Firefox compatibility');
+				enableDtls = true;
 			}
+		}
+
+		// Force DTLS if we're connecting to the conference server
+		if (address.indexOf('@conference.crocodilertc.net') >= 0) {
+			enableDtls = true;
+		}
+
+		if (enableDtls) {
+			if (!constraints) {
+				constraints = {};
+			}
+			if (!constraints.optional) {
+				constraints.optional = [];
+			}
+			constraints.optional.push({DtlsSrtpKeyAgreement: true});
+			console.log('Enabling DTLS for Firefox compatibility');
 		}
 
 		var mediaSession = new CrocSDK.MediaSession(this, sipSession, address, constraints);
