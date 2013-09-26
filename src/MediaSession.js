@@ -1367,6 +1367,8 @@
 		for (var participant in address) {
 			sipUA.sendRefer(participant, this.address);
 		}
+
+		return null;
 	};
 
 	/**
