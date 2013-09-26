@@ -56,15 +56,16 @@
 		// though it is in Canary (31).
 		xhr.responseType = "text";
 		xhr.onload = function() {
-			try {
+			if (this.status === 200) {
 				var resp = JSON.parse(this.response);
 				if (resp.result === "OK") {
 					success(resp.currency, resp.balance);
-				} else {
-					error();
+					return;
 				}
-			} catch (e) {
-				console.warn('getBalance callback threw exception:\n', e.stack);
+			}
+
+			if (error && typeof error === 'function') {
+				error();
 			}
 		};
 		xhr.onerror = error;
@@ -88,12 +89,17 @@
 	 * {@link CrocSDK.MediaAPI.connect media.connect} method with a list of
 	 * participants to invite; this method is included to allow more control
 	 * for applications that require it.
+	 * 
 	 * @param {CrocSDK.AccountAPI~createConferenceCallback} success
 	 * The callback function to run when a successful response is received.
-	 * @param {function} error
+	 * @param {function} [error]
 	 * The callback function to run when an error response is received.
 	 */
 	CrocSDK.AccountAPI.prototype.createConference = function(success, error) {
+		if (!success || typeof success !== 'function') {
+			throw new TypeError("Missing success callback function");
+		}
+
 		var url = this.baseConferenceUrl;
 		var xhr = new XMLHttpRequest();
 		xhr.withCredentials = true;
@@ -102,11 +108,14 @@
 		// though it is in Canary (31).
 		xhr.responseType = "text";
 		xhr.onload = function() {
-			try {
+			if (this.status === 201) {
 				var resp = JSON.parse(this.response);
 				success(resp.conferenceAddress);
-			} catch (e) {
-				console.warn('getBalance callback threw exception:\n', e.stack);
+				return;
+			}
+
+			if (error && typeof error === 'function') {
+				error();
 			}
 		};
 		xhr.onerror = error;
@@ -117,10 +126,14 @@
 
 	/**
 	 * Ends a conference hosted on the Crocodile network.
+	 * <p>
+	 * Note that conferences normally end when the last participant leaves. This
+	 * method is included to allow a conference to be ended early, kicking out
+	 * any remaining participants.
 	 * 
-	 * @param {function} success
+	 * @param {function} [success]
 	 * The callback function to run when a successful response is received.
-	 * @param {function} error
+	 * @param {function} [error]
 	 * The callback function to run when an error response is received.
 	 */
 	CrocSDK.AccountAPI.prototype.endConference = function(conferenceAddress,
@@ -133,10 +146,15 @@
 		// though it is in Canary (31).
 		xhr.responseType = "text";
 		xhr.onload = function() {
-			try {
-				success();
-			} catch (e) {
-				console.warn('getBalance callback threw exception:\n', e.stack);
+			if (this.status === 204) {
+				if (success && typeof success === 'function') {
+					success();
+				}
+				return;
+			}
+
+			if (error && typeof error === 'function') {
+				error();
 			}
 		};
 		xhr.onerror = error;

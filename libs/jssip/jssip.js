@@ -5759,7 +5759,7 @@ RTCSession.prototype.sendUpdate = function(options) {
 /**
  * Send a REFER
  *
- * @param {URI} target
+ * @param {String|URI} refer_uri
  * @param {Object} [options]
  * @param {Object} [options.eventHandlers]
  * @param {String[]} [options.extraHeaders]
@@ -7214,6 +7214,25 @@ UA.prototype.sendMessage = function(target, body, options) {
 
   message = new JsSIP.Message(this);
   message.send(target, body, options);
+};
+
+/**
+ * Send a REFER.
+ *
+ * @param {String|URI} target
+ * @param {String|URI} refer_uri
+ * @param {Object} [options]
+ * @param {Object} [options.eventHandlers]
+ * @param {String[]} [options.extraHeaders]
+ * @param {String} [options.contentType]
+ * @param {String} [options.body]
+ *
+ */
+UA.prototype.sendRefer = function(target, refer_uri, options) {
+  var refer;
+
+  refer = new JsSIP.Refer(this);
+  refer.send(target, refer_uri, options);
 };
 
 /**

@@ -156,22 +156,21 @@
 			return;
 		}
 
-		// Check the refer had a known target session
-		var referredSession = data.session;
-		if (!referredSession) {
-			data.refer.reject({
-				status_code: 403,
-				reason_phrase: 'Missing Target-Session Header'
-			});
-			return;
-		}
-
 		// Check that the refer is to a SIP URI
 		if (data.refer.refer_uri.scheme !== JsSIP.C.SIP) {
 			data.refer.reject({
 				status_code: 416,
 				reason_phrase: 'Unsupported Refer URI Scheme'
 			});
+		}
+
+		// Check whether the refer had a known target session
+		var referredSession = data.session;
+		if (!referredSession) {
+			// Give the application a chance to handle this
+			CrocSDK.Util.fireEvent(this, 'onReferRequest',
+					new ReferRequestEvent(this, data.refer), true);
+			return;
 		}
 
 		// Find the target session
@@ -197,15 +196,19 @@
 	 */
 
 	/**
-	 * Initiate a media session to <code>address</code>. Defaults to a
-	 * bi-directional audio session unless specified otherwise using the
-	 * <code>config</code> parameter.
+	 * Initiate a media session to an <code>address</code>, or an array of
+	 * addresses for a multi-party session.
+	 * <p>
+	 * The media session defaults to a bi-directional audio session unless
+	 * specified otherwise using the <code>config</code> parameter.
 	 * <p>
 	 * Returns a {@link CrocSDK.MediaAPI~MediaSession MediaSession} object which
 	 * the required event handlers should be registered with immediately to
 	 * avoid missing events.
 	 * 
-	 * @param {String} address - The target address for the media session.
+	 * @param {String|String[]} address
+	 * The target address for the media session. If an array of addresses is
+	 * provided, a multi-party session will be started.
 	 * @param {CrocSDK.MediaAPI~ConnectConfig} [connectConfig]
 	 * Optional configuration properties.
 	 * @returns CrocSDK.MediaAPI~MediaSession
@@ -218,8 +221,9 @@
 		var crocObject = this.crocObject;
 		var capabilityApi = crocObject.capability;
 		var sipSession = new JsSIP.RTCSession(crocObject.sipUA);
-		var watchData = capabilityApi.getWatchData(address);
+		var watchData = null;
 		var enableDtls = false;
+		var startConference = false;
 
 		if (!connectConfig) {
 			connectConfig = {};
@@ -227,18 +231,30 @@
 
 		var constraints = connectConfig.constraints || null;
 
-		// Force DTLS-SRTP if Chrome is calling Firefox.
-		// We don't turn this on by default to avoid problems with Asterisk.
-		if (watchData) {
-			if (/Chrome/.test(navigator.userAgent) &&
-					/Firefox/.test(watchData.userAgent)) {
+		if (CrocSDK.Util.isType(address, 'string[]')) {
+			console.log('Enabling DTLS for conference');
+			enableDtls = true;
+			startConference = true;
+		} else if (CrocSDK.Util.isType(address, 'string')) {
+			watchData = capabilityApi.getWatchData(address);
+
+			// Force DTLS-SRTP if Chrome is calling Firefox.
+			// We don't turn this on by default to avoid problems with Asterisk.
+			if (watchData) {
+				if (/Chrome/.test(navigator.userAgent) &&
+						/Firefox/.test(watchData.userAgent)) {
+					console.log('Enabling DTLS for Firefox compatibility');
+					enableDtls = true;
+				}
+			}
+
+			// Force DTLS if we're connecting to the conference server
+			if (address.indexOf('@conference.crocodilertc.net') >= 0) {
+				console.log('Enabling DTLS for conference');
 				enableDtls = true;
 			}
-		}
-
-		// Force DTLS if we're connecting to the conference server
-		if (address.indexOf('@conference.crocodilertc.net') >= 0) {
-			enableDtls = true;
+		} else {
+			throw new TypeError("Unexpected address type");
 		}
 
 		if (enableDtls) {
@@ -249,7 +265,6 @@
 				constraints.optional = [];
 			}
 			constraints.optional.push({DtlsSrtpKeyAgreement: true});
-			console.log('Enabling DTLS for Firefox compatibility');
 		}
 
 		var mediaSession = new CrocSDK.MediaSession(this, sipSession, address, constraints);
@@ -260,7 +275,24 @@
 		mediaSession.capabilities = watchData ? watchData.capabilities : null;
 		mediaSession.streamConfig = connectConfig.streamConfig || new CrocSDK.StreamConfig();
 
-		mediaSession._connect();
+		if (startConference) {
+			var success = function(conferenceAddress) {
+				mediaSession.address = conferenceAddress;
+				mediaSession._connect();
+
+				// Send REFERs to other participants
+				for (var participant in address) {
+					crocObject.sipUA.sendRefer(participant, conferenceAddress);
+				}
+			};
+			var error = function() {
+				console.warn("Conference creation failed");
+				mediaSession.close();
+			};
+			crocObject.account.createConference(success, error);
+		} else {
+			mediaSession._connect();
+		}
 
 		this.mediaSessions.push(mediaSession);
 		return mediaSession;
@@ -273,6 +305,86 @@
 		for ( var i = 0, len = this.mediaSessions.length; i < len; i++) {
 			this.mediaSessions[i].close();
 		}
+	};
+
+	/**
+	 * Event fired when a refer request is received.
+	 * <p>
+	 * Currently, refer requests are received when the user is invited to join
+	 * a network-hosted session. The user should be prompted to accept or
+	 * decline the invitation based on the destination.
+	 * <p>
+	 * If this event is not handled, refer requests will be rejected
+	 * automatically.
+	 * 
+	 * @event
+	 * @param {CrocSDK.MediaAPI~ReferRequestEvent} event
+	 * The event object associated with this event.
+	 */
+	MediaAPI.prototype.onReferRequest = function(event) {
+		event.reject();
+	};
+
+	/**
+	 * The event object for the
+	 * {@link CrocSDK.MediaAPI#event:onReferRequest onReferRequest}
+	 * event.
+	 * @constructor
+	 * @alias CrocSDK.MediaAPI~ReferRequestEvent
+	 * @param {CrocSDK.MediaAPI~MediaSession} session
+	 * @param {JsSIP.Refer} refer
+	 */
+	var ReferRequestEvent = function(mediaApi, refer) {
+		var self = this;
+
+		this.mediaApi = mediaApi;
+		this.refer = refer;
+		this.timer = setTimeout(function() {
+			self.reject();
+			self.timer = null;
+		}, mediaApi.acceptTimeout * 1000);
+
+		/**
+		 * The <code>address</code> to which we are being referred.
+		 * @type {String}
+		 */
+		this.address = refer.refer_uri.toString().replace(/^sip:/, '');
+	};
+
+	/**
+	 * Accept the incoming refer request. Returns a new <code>MediaSession</code>
+	 * object representing the media session with the refer target.
+	 * 
+	 * @param {CrocSDK.MediaAPI~ConnectConfig} [config]
+	 * Optional session configuration.
+	 * @returns {CrocSDK.MediaAPI~MediaSession}
+	 * The new session with the refer target.
+	 */
+	ReferRequestEvent.prototype.accept = function(config) {
+		if (this.timer === null) {
+			return;
+		}
+		clearTimeout(this.timer);
+		this.timer = null;
+
+		var newSession = this.mediaApi.connect(this.address, config);
+		this.refer.addSessionNotifyHandlers(newSession.sipSession);
+		return newSession;
+	};
+
+	/**
+	 * Reject the incoming refer request.
+	 */
+	ReferRequestEvent.prototype.reject = function() {
+		if (this.timer === null) {
+			return;
+		}
+		clearTimeout(this.timer);
+		this.timer = null;
+
+		this.refer.reject({
+			status_code: 603
+		});
 	};
 
 	/* Further Documentation in JSDoc */
@@ -303,20 +415,19 @@
 	// Documented Events
 
 	/**
-	 * Dispatched when Crocodile RTC JavaScript Library receives a request 
-	 * for a new session from another party on the Crocodile RTC Network.
+	 * Event fired when a request for a new session is received from another
+	 * party.
 	 * <p>
-	 * An instance of Crocodile RTC JavaScript Library cannot receive inbound
-	 * sessions unless the <code>register</code> property was set to
-	 * <code>true</code> when the {@link CrocSDK.Croc Croc} Object was
-	 * instantiated.
+	 * Note that inbound session requests cannot be received unless the
+	 * <code>register</code> property was set to <code>true</code> when the
+	 * {@link CrocSDK.Croc Croc} object was created.
 	 * <p>
-	 * If this event is not handled the Crocodile RTC JavaScript Library will
-	 * automatically reject inbound sessions.
+	 * If this event is not handled, inbound sessions will be rejected
+	 * automatically.
 	 * 
 	 * @event CrocSDK.MediaAPI#onMediaSession
-	 * @param {CrocSDK.MediaAPI~MediaSessionEvent}
-	 * [event] The event object associated with this event.
+	 * @param {CrocSDK.MediaAPI~MediaSessionEvent} event
+	 * The event object associated with this event.
 	 */
 
 	CrocSDK.MediaAPI = MediaAPI;

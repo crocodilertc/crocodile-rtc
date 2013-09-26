@@ -1334,6 +1334,42 @@
 	};
 
 	/**
+	 * Invites an additional party to the session.
+	 * <p>
+	 * Note that adding an additional party may require a new media session.
+	 * In this case the new session will be returned, and the existing session
+	 * can be closed once it is no longer required (you may prefer to wait for
+	 * the new session to connect first). If the current session supports
+	 * additional parties, the function will return <code>null</code>.
+	 * 
+	 * @param {String|String[]} address
+	 * The address of the user to invite, or array of addresses to invite.
+	 * @returns {CrocSDK.MediaAPI~MediaSession}
+	 * The new media session, or <code>null</code> if the existing session
+	 * supports additional parties.
+	 */
+	MediaSession.prototype.invite = function(address) {
+		if (CrocSDK.Util.isType(address, 'string')) {
+			address = [address];
+		} else if (!CrocSDK.Util.isType(address, 'string[]')) {
+			throw new TypeError('Unexpected address type: ' + typeof address);
+		}
+
+		if (this.address.indexOf('conference.crocodilertc.net') < 0) {
+			address.unshift(this.address);
+			return this.mediaApi.connect(address, {
+				streamConfig: this.streamConfig
+			});
+		}
+
+		// Send REFERs to new participants
+		var sipUA = this.mediaApi.crocObject.sipUA;
+		for (var participant in address) {
+			sipUA.sendRefer(participant, this.address);
+		}
+	};
+
+	/**
 	 * Explicitly close this media session.
 	 * <p>
 	 * If <code>accept()</code> has not been called the session will be
