@@ -578,6 +578,10 @@ var CrocSDK = {};
 			this.timerId = null;
 		}
 	};
+	RestAuthManager.prototype.restart = function() {
+		this.stop();
+		this.start();
+	};
 	RestAuthManager.prototype.auth = function() {
 		var self = this;
 		var md5 = JsSIP.Utils.calculateMD5;

@@ -48,6 +48,7 @@
 	 * The callback function to run when an error response is received.
 	 */
 	CrocSDK.AccountAPI.prototype.getBalance = function(success, error) {
+		var crocObject = this.crocObject;
 		var url = this.baseAccountUrl + "/balance";
 		var xhr = new XMLHttpRequest();
 		xhr.withCredentials = true;
@@ -62,6 +63,11 @@
 					success(resp.currency, resp.balance);
 					return;
 				}
+			}
+
+			if (this.status === 403) {
+				// Authentication failed - try re-auth
+				crocObject.authManager.restart();
 			}
 
 			if (error && typeof error === 'function') {
@@ -100,6 +106,7 @@
 			throw new TypeError("Missing success callback function");
 		}
 
+		var crocObject = this.crocObject;
 		var url = this.baseConferenceUrl;
 		var xhr = new XMLHttpRequest();
 		xhr.withCredentials = true;
@@ -112,6 +119,11 @@
 				var resp = JSON.parse(this.response);
 				success(resp.conferenceAddress);
 				return;
+			}
+
+			if (this.status === 403) {
+				// Authentication failed - try re-auth
+				crocObject.authManager.restart();
 			}
 
 			if (error && typeof error === 'function') {
@@ -138,6 +150,7 @@
 	 */
 	CrocSDK.AccountAPI.prototype.endConference = function(conferenceAddress,
 			success, error) {
+		var crocObject = this.crocObject;
 		var url = this.baseConferenceUrl + "/" + conferenceAddress;
 		var xhr = new XMLHttpRequest();
 		xhr.withCredentials = true;
@@ -151,6 +164,11 @@
 					success();
 				}
 				return;
+			}
+
+			if (this.status === 403) {
+				// Authentication failed - try re-auth
+				crocObject.authManager.restart();
 			}
 
 			if (error && typeof error === 'function') {
