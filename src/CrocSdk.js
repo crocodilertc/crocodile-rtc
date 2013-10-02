@@ -30,7 +30,7 @@ var CrocSDK = {};
 	};
 
 	var crocNetworkDefaultConfig = {
-		sipProxySet: 'edge00.crocodilertc.net',
+		sipProxySet: ['edge00.crocodilertc.net', 'edge01.crocodilertc.net'],
 		xmppProxySet: ['cm.crocodilertc.net'],
 		turnManagerUrl: 'https://hub.crocodilertc.net:8443/crocodile-sdk-hub/rest/1.0/ephemeral',
 		msrpManagerUrl: 'https://hub.crocodilertc.net:8443/crocodile-sdk-hub/rest/1.0/ephemeral'
