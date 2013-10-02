@@ -137,6 +137,58 @@
 	};
 
 	/**
+	 * Callback executed when a successful response is received for a
+	 * {@link CrocSDK.AccountAPI.listConferences listConferences} request.
+	 * @callback CrocSDK.AccountAPI~listConferencesCallback
+	 * @param {string[]} conferenceAddresses
+	 * The list of conference addresses owned by the current subscriber.
+	 */
+
+	/**
+	 * Lists the conferences hosted on the Crocodile network for the current
+	 * subscriber.
+	 * 
+	 * @param {CrocSDK.AccountAPI~listConferencesCallback} success
+	 * The callback function to run when a successful response is received.
+	 * @param {function} [error]
+	 * The callback function to run when an error response is received.
+	 */
+	CrocSDK.AccountAPI.prototype.listConferences = function(success, error) {
+		if (!success || typeof success !== 'function') {
+			throw new TypeError("Missing success callback function");
+		}
+
+		var crocObject = this.crocObject;
+		var url = this.baseConferenceUrl;
+		var xhr = new XMLHttpRequest();
+		xhr.withCredentials = true;
+		xhr.timeout = 5000;
+		// responseType = "json" is not yet working in Chrome stable (29),
+		// though it is in Canary (31).
+		xhr.responseType = "text";
+		xhr.onload = function() {
+			if (this.status === 200) {
+				var resp = JSON.parse(this.response);
+				success(resp.conferenceAddresses);
+				return;
+			}
+
+			if (this.status === 403) {
+				// Authentication failed - try re-auth
+				crocObject.authManager.restart();
+			}
+
+			if (error && typeof error === 'function') {
+				error();
+			}
+		};
+		xhr.onerror = error;
+		xhr.ontimeout = error;
+		xhr.open("GET", url);
+		xhr.send();
+	};
+
+	/**
 	 * Ends a conference hosted on the Crocodile network.
 	 * <p>
 	 * Note that conferences normally end when the last participant leaves. This
