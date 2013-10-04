@@ -189,12 +189,124 @@
 	};
 
 	/**
+	 * Callback executed when a successful response is received for a
+	 * {@link CrocSDK.AccountAPI.getConferenceDetails getConferenceDetails}
+	 * request.
+	 * @callback CrocSDK.AccountAPI~getConferenceDetailsCallback
+	 * @param {Date} created
+	 * The date and time the conference was created.
+	 * @param {string} owner
+	 * The creator/owner of the conference.
+	 * @param {string[]} participantAddresses
+	 * The list of addresses participating in this conference.
+	 */
+
+	/**
+	 * Retrieves details of a conference hosted on the Crocodile network.
+	 * <p>
+	 * Only the conference owner is allowed to retrieve these details.
+	 * 
+	 * @param {string} conferenceAddress
+	 * The address of the target conference.
+	 * @param {CrocSDK.AccountAPI~getConferenceDetailsCallback} success
+	 * The callback function to run when a successful response is received.
+	 * @param {function} [error]
+	 * The callback function to run when an error response is received.
+	 */
+	CrocSDK.AccountAPI.prototype.getConferenceDetails = function(conferenceAddress,
+			success, error) {
+		if (!success || typeof success !== 'function') {
+			throw new TypeError("Missing success callback function");
+		}
+
+		var crocObject = this.crocObject;
+		var url = this.baseConferenceUrl + "/" + conferenceAddress;
+		var xhr = new XMLHttpRequest();
+		xhr.withCredentials = true;
+		xhr.timeout = 5000;
+		// responseType = "json" is not yet working in Chrome stable (29),
+		// though it is in Canary (31).
+		xhr.responseType = "text";
+		xhr.onload = function() {
+			if (this.status === 200) {
+				var resp = JSON.parse(this.response);
+				success(new Date(resp.created), resp.owner,
+						resp.participantAddresses);
+				return;
+			}
+
+			if (this.status === 403) {
+				// Authentication failed - try re-auth
+				crocObject.authManager.restart();
+			}
+
+			if (error && typeof error === 'function') {
+				error();
+			}
+		};
+		xhr.onerror = error;
+		xhr.ontimeout = error;
+		xhr.open("GET", url);
+		xhr.send();
+	};
+
+	/**
+	 * Kicks a participant from a conference hosted on the Crocodile network.
+	 * <p>
+	 * Only the conference owner is allowed to kick participants.
+	 * 
+	 * @param {string} conferenceAddress
+	 * The address of the target conference.
+	 * @param {string} participantAddress
+	 * The address of the target participant.
+	 * @param {function} [success]
+	 * The callback function to run when a successful response is received.
+	 * @param {function} [error]
+	 * The callback function to run when an error response is received.
+	 */
+	CrocSDK.AccountAPI.prototype.kickConferenceParticipant = function(
+			conferenceAddress, participantAddress, success, error) {
+		var crocObject = this.crocObject;
+		var url = this.baseConferenceUrl;
+		url += "/" + conferenceAddress + "/" + participantAddress;
+		var xhr = new XMLHttpRequest();
+		xhr.withCredentials = true;
+		xhr.timeout = 5000;
+		// responseType = "json" is not yet working in Chrome stable (29),
+		// though it is in Canary (31).
+		xhr.responseType = "text";
+		xhr.onload = function() {
+			if (this.status === 204) {
+				if (success && typeof success === 'function') {
+					success();
+				}
+				return;
+			}
+
+			if (this.status === 403) {
+				// Authentication failed - try re-auth
+				crocObject.authManager.restart();
+			}
+
+			if (error && typeof error === 'function') {
+				error();
+			}
+		};
+		xhr.onerror = error;
+		xhr.ontimeout = error;
+		xhr.open("DELETE", url);
+		xhr.send();
+	};
+
+	/**
 	 * Ends a conference hosted on the Crocodile network.
 	 * <p>
 	 * Note that conferences normally end when the last participant leaves. This
 	 * method is included to allow a conference to be ended early, kicking out
 	 * any remaining participants.
 	 * 
+	 * @param {string} conferenceAddress
+	 * The address of the target conference.
 	 * @param {function} [success]
 	 * The callback function to run when a successful response is received.
 	 * @param {function} [error]

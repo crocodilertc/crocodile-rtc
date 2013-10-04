@@ -423,6 +423,7 @@
 			return;
 		}
 
+		console.log("Requesting user media", constraints);
 		JsSIP.WebRTC.getUserMedia(constraints, mediaSuccess, mediaFailure);
 	};
 
@@ -468,6 +469,7 @@
 		}
 
 		if (enabled) {
+			console.log("Requesting user media", constraints);
 			JsSIP.WebRTC.getUserMedia(constraints, mediaSuccess, mediaFailure);
 		} else {
 			// Ensure calling function finishes before calling onSuccess to
