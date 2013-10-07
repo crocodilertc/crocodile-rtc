@@ -58,6 +58,11 @@
 					mLine.replaceAttribute(oldDirection, newDirection, null);
 					sdpChanged = true;
 				}
+
+				if (config.bandwidth) {
+					mLine.bandwidth = ['AS:' + config.bandwidth];
+					sdpChanged = true;
+				}
 			}
 		}
 
