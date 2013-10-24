@@ -1371,8 +1371,8 @@
 
 		// Send REFERs to new participants
 		var sipUA = this.mediaApi.crocObject.sipUA;
-		for (var participant in address) {
-			sipUA.sendRefer(participant, this.address);
+		for (var i = 0, len = address.length; i < len; i++) {
+			sipUA.sendRefer(address[i], this.address);
 		}
 
 		return null;

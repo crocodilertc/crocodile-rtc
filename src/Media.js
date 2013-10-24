@@ -281,8 +281,8 @@
 				mediaSession._connect();
 
 				// Send REFERs to other participants
-				for (var participant in address) {
-					crocObject.sipUA.sendRefer(participant, conferenceAddress);
+				for (var i = 0, len = address.length; i < len; i++) {
+					crocObject.sipUA.sendRefer(address[i], conferenceAddress);
 				}
 			};
 			var error = function() {
