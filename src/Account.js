@@ -40,11 +40,20 @@
 	 */
 
 	/**
+	 * Callback executed when an error response is received.
+	 * @callback CrocSDK.AccountAPI~errorCallback
+	 * @param {number} status
+	 * The status code returned by the server.
+	 * @param {string} message
+	 * The error message returned by the server.
+	 */
+
+	/**
 	 * Retrieves the subscriber's current balance.
 	 * 
 	 * @param {CrocSDK.AccountAPI~balanceCallback} success
 	 * The callback function to run when a successful response is received.
-	 * @param {function} error
+	 * @param {CrocSDK.AccountAPI~errorCallback} error
 	 * The callback function to run when an error response is received.
 	 */
 	CrocSDK.AccountAPI.prototype.getBalance = function(success, error) {
@@ -71,7 +80,7 @@
 			}
 
 			if (error && typeof error === 'function') {
-				error();
+				error(this.status, this.response);
 			}
 		};
 		xhr.onerror = error;
@@ -96,12 +105,29 @@
 	 * participants to invite; this method is included to allow more control
 	 * for applications that require it.
 	 * 
+	 * @param {Object} config
+	 * Configuration for the new conference. This can be null or an empty object
+	 * to use the default configuration.
+	 * @param {number} [config.layout]
+	 * The layout to use for the conference. The following layouts are supported:
+	 * <ul>
+	 * <li>0: 1x1</li>
+	 * <li>1: 2x2</li>
+	 * <li>2: 3x3</li>
+	 * <li>3: 3 large plus 4 small</li>
+	 * <li>4: 1 large plus 7 small</li>
+	 * <li>5: 1 large plus 5 small</li>
+	 * <li>6: 2 large</li>
+	 * <li>7: 1 picture-in-picture</li>
+	 * <li>8: 3 pictures-in-picture</li>
+	 * <li>9: 4x4</li>
+	 * </ul>
 	 * @param {CrocSDK.AccountAPI~createConferenceCallback} success
 	 * The callback function to run when a successful response is received.
-	 * @param {function} [error]
+	 * @param {CrocSDK.AccountAPI~errorCallback} [error]
 	 * The callback function to run when an error response is received.
 	 */
-	CrocSDK.AccountAPI.prototype.createConference = function(success, error) {
+	CrocSDK.AccountAPI.prototype.createConference = function(config, success, error) {
 		if (!success || typeof success !== 'function') {
 			throw new TypeError("Missing success callback function");
 		}
@@ -127,13 +153,17 @@
 			}
 
 			if (error && typeof error === 'function') {
-				error();
+				error(this.status, this.response);
 			}
 		};
 		xhr.onerror = error;
 		xhr.ontimeout = error;
 		xhr.open("POST", url);
-		xhr.send();
+		xhr.setRequestHeader("Content-Type", "application/json");
+		if (!config) {
+			config = {};
+		}
+		xhr.send(JSON.stringify(config));
 	};
 
 	/**
@@ -150,7 +180,7 @@
 	 * 
 	 * @param {CrocSDK.AccountAPI~listConferencesCallback} success
 	 * The callback function to run when a successful response is received.
-	 * @param {function} [error]
+	 * @param {CrocSDK.AccountAPI~errorCallback} [error]
 	 * The callback function to run when an error response is received.
 	 */
 	CrocSDK.AccountAPI.prototype.listConferences = function(success, error) {
@@ -179,7 +209,7 @@
 			}
 
 			if (error && typeof error === 'function') {
-				error();
+				error(this.status, this.response);
 			}
 		};
 		xhr.onerror = error;
@@ -210,7 +240,7 @@
 	 * The address of the target conference.
 	 * @param {CrocSDK.AccountAPI~getConferenceDetailsCallback} success
 	 * The callback function to run when a successful response is received.
-	 * @param {function} [error]
+	 * @param {CrocSDK.AccountAPI~errorCallback} [error]
 	 * The callback function to run when an error response is received.
 	 */
 	CrocSDK.AccountAPI.prototype.getConferenceDetails = function(conferenceAddress,
@@ -241,7 +271,7 @@
 			}
 
 			if (error && typeof error === 'function') {
-				error();
+				error(this.status, this.response);
 			}
 		};
 		xhr.onerror = error;
@@ -261,7 +291,7 @@
 	 * The address of the target participant.
 	 * @param {function} [success]
 	 * The callback function to run when a successful response is received.
-	 * @param {function} [error]
+	 * @param {CrocSDK.AccountAPI~errorCallback} [error]
 	 * The callback function to run when an error response is received.
 	 */
 	CrocSDK.AccountAPI.prototype.kickConferenceParticipant = function(
@@ -289,7 +319,7 @@
 			}
 
 			if (error && typeof error === 'function') {
-				error();
+				error(this.status, this.response);
 			}
 		};
 		xhr.onerror = error;
@@ -309,7 +339,7 @@
 	 * The address of the target conference.
 	 * @param {function} [success]
 	 * The callback function to run when a successful response is received.
-	 * @param {function} [error]
+	 * @param {CrocSDK.AccountAPI~errorCallback} [error]
 	 * The callback function to run when an error response is received.
 	 */
 	CrocSDK.AccountAPI.prototype.endConference = function(conferenceAddress,
@@ -336,7 +366,7 @@
 			}
 
 			if (error && typeof error === 'function') {
-				error();
+				error(this.status, this.response);
 			}
 		};
 		xhr.onerror = error;

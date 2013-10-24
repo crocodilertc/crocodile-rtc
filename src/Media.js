@@ -289,7 +289,7 @@
 				console.warn("Conference creation failed");
 				mediaSession.close();
 			};
-			crocObject.account.createConference(success, error);
+			crocObject.account.createConference(null, success, error);
 		} else {
 			mediaSession._connect();
 		}
