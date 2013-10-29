@@ -313,7 +313,7 @@
 	 *       },
 	 *       
 	 *       data: {
-	 *         onSession: function(event) {
+	 *         onDataSession: function(event) {
 	 *           // Add event handler for file transfers on the new incoming session
 	 *           event.session.onDataStart = function (event) {
 	 *             // Create new progress bar for each file transfer
@@ -506,11 +506,11 @@
 	 *     var crocObject = $.croc({
 	 *       apiKey: "API_KEY_GOES_HERE",
 	 *       onConnected: function () {
-	 *         this.data.send('bob@example.com', 'Web application ready');
+	 *         this.data.send('bob@crocodilertc.net', 'Web application ready');
 	 *       },
 	 *       
 	 *       data: {
-	 *         onSession: function(event) {
+	 *         onDataSession: function(event) {
 	 *           // Accept every incoming session
 	 *           event.session.accept();
 	 *         },

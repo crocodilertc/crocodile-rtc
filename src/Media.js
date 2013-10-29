@@ -22,13 +22,13 @@
 	 *       // Some code
 	 *     },
 	 *   
+	 *     // General configuration
+	 *     acceptTimeout: 30,   // Incoming sessions will be rejected if not accepted within this time (seconds)
+	 *     
 	 *     // Media API configuration
 	 *     media: {
-	 *       // Optional parameters (with default values)
-	 *       acceptTimeout: 30,
-	 *   
 	 *       // Optional event handlers
-	 *       onSession: function(event) {
+	 *       onMediaSession: function(event) {
 	 *         // Handle new incoming session
 	 *       }
 	 *     }

@@ -231,7 +231,7 @@
 	 *       
 	 *       capability: {
 	 *         refreshPeriod: 15,
-	 *         onWatch: function(event) {
+	 *         onWatchRequest: function(event) {
 	 *           // Some code
 	 *         },
 	 *         onWatchChange: function(event) {
