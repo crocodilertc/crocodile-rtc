@@ -184,6 +184,15 @@
 		}
 	}
 
+	function setMediaElementSource(element, stream) {
+		// New stream assignment style - not yet supported by browsers
+		element.srcObject = stream;
+		if (window.URL.createObjectURL) {
+			// Old stream assignment style
+			element.src = window.URL.createObjectURL(stream);
+		}
+	}
+
 	/**
 	 * MediaSession objects allow control and monitoring of media sessions with
 	 * other instances of the Crocodile RTC JavaScript Library, or other SIP
@@ -373,13 +382,14 @@
 				return;
 			}
 
+			var lve = mediaSession.localVideoElement;
 			console.log('Got local media stream');
 			removeOldStream();
 			mediaSession.localStream = stream;
 			mediaSession.peerConnection.addStream(stream);
-			if (constraints.video && mediaSession.localVideoElement) {
-				mediaSession.localVideoElement.src = window.URL.createObjectURL(stream);
-				mediaSession.localVideoElement.muted = true;
+			if (constraints.video && lve) {
+				setMediaElementSource(lve, stream);
+				lve.muted = true;
 			}
 
 			mediaSession._getScreenMedia(screencapture, onSuccess);
@@ -631,13 +641,13 @@
 
 			if (videoTracks.length > 0) {
 				if (this.remoteVideoElement) {
-					this.remoteVideoElement.src = window.URL.createObjectURL(stream);
+					setMediaElementSource(this.remoteVideoElement, stream);
 				} else {
 					console.warn('Video received, but no remoteVideoElement provided');
 				}
 			} else if (audioTracks.length > 0) {
 				if (this.remoteAudioElement) {
-					this.remoteAudioElement.src = window.URL.createObjectURL(stream);
+					setMediaElementSource(this.remoteAudioElement, stream);
 				} else {
 					console.warn('Audio stream received, but no remoteAudioElement provided');
 				}
