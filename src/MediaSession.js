@@ -189,6 +189,15 @@
 		}
 	}
 
+	function setMediaElementSource(element, stream) {
+		// New stream assignment style - not yet supported by browsers
+		element.srcObject = stream;
+		if (window.URL.createObjectURL) {
+			// Old stream assignment style
+			element.src = window.URL.createObjectURL(stream);
+		}
+	}
+
 	/**
 	 * MediaSession objects allow control and monitoring of media sessions with
 	 * other instances of the Crocodile RTC JavaScript Library, or other SIP
@@ -378,13 +387,14 @@
 				return;
 			}
 
+			var lve = mediaSession.localVideoElement;
 			console.log('Got local media stream');
 			removeOldStream();
 			mediaSession.localStream = stream;
 			mediaSession.peerConnection.addStream(stream);
-			if (constraints.video && mediaSession.localVideoElement) {
-				mediaSession.localVideoElement.src = window.URL.createObjectURL(stream);
-				mediaSession.localVideoElement.muted = true;
+			if (constraints.video && lve) {
+				setMediaElementSource(lve, stream);
+				lve.muted = true;
 			}
 
 			mediaSession._getScreenMedia(screencapture, onSuccess);
@@ -395,21 +405,25 @@
 		};
 
 		// Handle media constraints
-		if (this.audioConstraints &&
-				CrocSDK.Util.isType(constraints.audio, 'boolean')) {
-			// Keep previous constraints
-			constraints.audio = this.audioConstraints;
-		} else if (CrocSDK.Util.isType(constraints.audio, 'object')) {
-			// Save the requested constraints
-			this.audioConstraints = constraints.audio;
+		if (constraints.audio) {
+			if (this.audioConstraints &&
+					CrocSDK.Util.isType(constraints.audio, 'boolean')) {
+				// Keep previous constraints
+				constraints.audio = this.audioConstraints;
+			} else if (CrocSDK.Util.isType(constraints.audio, 'object')) {
+				// Save the requested constraints
+				this.audioConstraints = constraints.audio;
+			}
 		}
-		if (this.videoConstraints &&
-				CrocSDK.Util.isType(constraints.video, 'boolean')) {
-			// Keep previous constraints
-			constraints.video = this.videoConstraints;
-		} else if (CrocSDK.Util.isType(constraints.video, 'object')) {
-			// Save the requested constraints
-			this.videoConstraints = constraints.video;
+		if (constraints.video){
+			if (this.videoConstraints &&
+					CrocSDK.Util.isType(constraints.video, 'boolean')) {
+				// Keep previous constraints
+				constraints.video = this.videoConstraints;
+			} else if (CrocSDK.Util.isType(constraints.video, 'object')) {
+				// Save the requested constraints
+				this.videoConstraints = constraints.video;
+			}
 		}
 
 		var v = constraints.video;
@@ -428,7 +442,7 @@
 			return;
 		}
 
-		console.log("Requesting user media", constraints);
+		console.log('Requesting user media:', constraints);
 		JsSIP.WebRTC.getUserMedia(constraints, mediaSuccess, mediaFailure);
 	};
 
@@ -474,7 +488,7 @@
 		}
 
 		if (enabled) {
-			console.log("Requesting user media", constraints);
+			console.log('Requesting user media:', constraints);
 			JsSIP.WebRTC.getUserMedia(constraints, mediaSuccess, mediaFailure);
 		} else {
 			// Ensure calling function finishes before calling onSuccess to
@@ -632,13 +646,13 @@
 
 			if (videoTracks.length > 0) {
 				if (this.remoteVideoElement) {
-					this.remoteVideoElement.src = window.URL.createObjectURL(stream);
+					setMediaElementSource(this.remoteVideoElement, stream);
 				} else {
 					console.warn('Video received, but no remoteVideoElement provided');
 				}
 			} else if (audioTracks.length > 0) {
 				if (this.remoteAudioElement) {
-					this.remoteAudioElement.src = window.URL.createObjectURL(stream);
+					setMediaElementSource(this.remoteAudioElement, stream);
 				} else {
 					console.warn('Audio stream received, but no remoteAudioElement provided');
 				}

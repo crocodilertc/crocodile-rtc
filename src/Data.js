@@ -249,15 +249,18 @@
 	 *       // Some code
 	 *     },
 	 *     
+	 *     // General configuration
+	 *     acceptTimeout: 300,   // Incoming sessions will be rejected if not accepted within this time (seconds)
+	 *     
 	 *     // Data API configuration
 	 *     data: {
 	 *       // Optional parameters
-	 *       acceptTimeout: 300,   // Incoming sessions will be rejected if not accepted within this time (seconds)
 	 *       idleTimeout: 300,     // Idle sessions will be closed if not reused within this time (seconds)
 	 *       
 	 *       // Optional event handlers
-	 *       onSession: function(event) {
+	 *       onDataSession: function(event) {
 	 *         // Handle incoming session
+	 *         event.session.accept();
 	 *       },
 	 *       onData: function(event) {
 	 *         // Handle incoming data (simple case, where SDK handles sessions)

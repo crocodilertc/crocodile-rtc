@@ -22,13 +22,13 @@
 	 *       // Some code
 	 *     },
 	 *   
+	 *     // General configuration
+	 *     acceptTimeout: 30,   // Incoming sessions will be rejected if not accepted within this time (seconds)
+	 *     
 	 *     // Media API configuration
 	 *     media: {
-	 *       // Optional parameters (with default values)
-	 *       acceptTimeout: 30,
-	 *   
 	 *       // Optional event handlers
-	 *       onSession: function(event) {
+	 *       onMediaSession: function(event) {
 	 *         // Handle new incoming session
 	 *       }
 	 *     }
@@ -222,18 +222,20 @@
 		var capabilityApi = crocObject.capability;
 		var sipSession = new JsSIP.RTCSession(crocObject.sipUA);
 		var watchData = null;
-		var enableDtls = false;
 		var startConference = false;
 
 		if (!connectConfig) {
 			connectConfig = {};
 		}
 
-		var constraints = connectConfig.constraints || null;
+		// Disable DTLS by default until network supports it
+		var constraints = connectConfig.constraints || {};
+		if (!constraints.mandatory) {
+			constraints.mandatory = {};
+		}
+		constraints.mandatory.DtlsSrtpKeyAgreement = false;
 
 		if (CrocSDK.Util.isType(address, 'string[]')) {
-			console.log('Enabling DTLS for conference');
-			enableDtls = true;
 			startConference = true;
 		} else if (CrocSDK.Util.isType(address, 'string')) {
 			watchData = capabilityApi.getWatchData(address);
@@ -244,27 +246,11 @@
 				if (/Chrome/.test(navigator.userAgent) &&
 						/Firefox/.test(watchData.userAgent)) {
 					console.log('Enabling DTLS for Firefox compatibility');
-					enableDtls = true;
+					constraints.mandatory.DtlsSrtpKeyAgreement = true;
 				}
-			}
-
-			// Force DTLS if we're connecting to the conference server
-			if (address.indexOf('@conference.crocodilertc.net') >= 0) {
-				console.log('Enabling DTLS for conference');
-				enableDtls = true;
 			}
 		} else {
 			throw new TypeError("Unexpected address type");
-		}
-
-		if (enableDtls) {
-			if (!constraints) {
-				constraints = {};
-			}
-			if (!constraints.optional) {
-				constraints.optional = [];
-			}
-			constraints.optional.push({DtlsSrtpKeyAgreement: true});
 		}
 
 		var mediaSession = new CrocSDK.MediaSession(this, sipSession, address, constraints);
