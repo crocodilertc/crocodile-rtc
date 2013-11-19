@@ -320,6 +320,7 @@
 		configureRemoteMediaDetection(this);
 		configurePeerConnectionDebug(this.peerConnection);
 		this.peerConnection.onnegotiationneeded = this._handleNegotiationNeeded.bind(this);
+		this.peerConnection.onaddstream = this._handleAddStream.bind(this);
 
 		// Configure JsSIP event handlers
 		var mediaSession = this;
@@ -623,7 +624,7 @@
 	 * @private
 	 */
 	MediaSession.prototype._setRemoteStreamOutput = function() {
-		var streams, stream, audioTracks, videoTracks;
+		var streams;
 		var pc = this.peerConnection;
 
 		if (pc.getRemoteStreams) {
@@ -635,22 +636,32 @@
 		}
 
 		for (var idx = 0, len = streams.length; idx < len; idx++) {
-			stream = streams[idx];
-			audioTracks = stream.getAudioTracks();
-			videoTracks = stream.getVideoTracks();
+			this._handleAddStream({stream: streams[idx]});
+		}
+	};
 
-			if (videoTracks.length > 0) {
-				if (this.remoteVideoElement) {
-					setMediaElementSource(this.remoteVideoElement, stream);
-				} else {
-					console.warn('Video received, but no remoteVideoElement provided');
-				}
-			} else if (audioTracks.length > 0) {
-				if (this.remoteAudioElement) {
-					setMediaElementSource(this.remoteAudioElement, stream);
-				} else {
-					console.warn('Audio stream received, but no remoteAudioElement provided');
-				}
+	/**
+	 * @param {MediaStreamEvent} event
+	 * @private
+	 */
+	MediaSession.prototype._handleAddStream = function(event) {
+		var stream, audioTracks, videoTracks;
+
+		stream = event.stream;
+		audioTracks = stream.getAudioTracks();
+		videoTracks = stream.getVideoTracks();
+
+		if (videoTracks.length > 0) {
+			if (this.remoteVideoElement) {
+				setMediaElementSource(this.remoteVideoElement, stream);
+			} else {
+				console.log('Video received, but no remoteVideoElement provided');
+			}
+		} else if (audioTracks.length > 0) {
+			if (this.remoteAudioElement) {
+				setMediaElementSource(this.remoteAudioElement, stream);
+			} else {
+				console.log('Audio stream received, but no remoteAudioElement provided');
 			}
 		}
 	};
@@ -758,7 +769,6 @@
 			var onSuccess = function() {
 				console.log('Remote answer set');
 				CrocSDK.Util.fireEvent(mediaSession, 'onConnect', {});
-				mediaSession._setRemoteStreamOutput();
 			};
 			var onFailure = function(error) {
 				console.warn('setRemoteDescription failed:', error);
@@ -925,7 +935,6 @@
 			data.reinvite.on('succeeded', function(event) {
 				var onSuccess = function() {
 					console.log('Remote answer set');
-					self._setRemoteStreamOutput();
 				};
 				var onFailure = function(error) {
 					console.warn('setRemoteDescription failed:', error);
