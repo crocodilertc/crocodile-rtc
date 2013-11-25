@@ -149,6 +149,8 @@
 	Util.fireEvent = function (parent, event, data, runDefault) {
 		if (runDefault || parent.hasOwnProperty(event)) {
 			try {
+				console.log('Firing event ' + parent.constructor.name + '.' +
+						event + ':', data);
 				parent[event](data);
 			} catch (e) {
 				console.warn(parent.constructor.name + '.' + event +

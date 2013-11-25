@@ -117,52 +117,6 @@
 		};
 	}
 
-	function configureRemoteMediaDetection(mediaSession) {
-		var fireEvent = function() {
-			// Make sure we only fire the event once
-			if (mediaSession.remoteMediaReceived) {
-				return;
-			}
-			mediaSession.remoteMediaReceived = true;
-			// Decouple event from this thread, in case we have not yet handed
-			// the media session to the higher-level app.
-			setTimeout(function() {
-				CrocSDK.Util.fireEvent(mediaSession, 'onRemoteMediaReceived', {});
-			}, 0);
-		};
-
-		var checkTrackLive = function(track) {
-			if (track.readyState === 'live') {
-				// Fire event now
-				fireEvent();
-			} else {
-				// Wait for the track to unmute
-				track.onunmute = fireEvent;
-			}
-		};
-
-		// Wait for onaddstream event, which should fire when the remote
-		// session description has been provided.
-		mediaSession.peerConnection.onaddstream = function(event) {
-			if (mediaSession.remoteMediaReceived) {
-				return;
-			}
-
-			// We only expect one stream, with a maximum of one audio track
-			// and/or one video track
-			var stream = event.stream;
-			var audioTracks = stream.getAudioTracks();
-			var videoTracks = stream.getVideoTracks();
-
-			if (audioTracks.length > 0) {
-				checkTrackLive(audioTracks[0]);
-			}
-			if (videoTracks.length > 0) {
-				checkTrackLive(videoTracks[0]);
-			}
-		};
-	}
-
 	function configurePeerConnectionDebug(pc) {
 		var onSigStateChange = function() {
 			console.log('PC: signalling state change:', this.signalingState);
@@ -322,7 +276,6 @@
 		 */
 		this.localVideoElement = null;
 
-		configureRemoteMediaDetection(this);
 		configurePeerConnectionDebug(this.peerConnection);
 		this.peerConnection.onnegotiationneeded = this._handleNegotiationNeeded.bind(this);
 		this.peerConnection.onaddstream = this._handleAddStream.bind(this);
@@ -351,6 +304,7 @@
 			mediaSession.close(status);
 			// Auth failures should trigger croc object to stop
 			if (event.data.cause === JsSIP.C.causes.AUTHENTICATION_ERROR) {
+				console.log('INVITE authentication failed - stopping');
 				croc.stop();
 			}
 		});
@@ -601,16 +555,7 @@
 			console.warn('createOffer failed:', error);
 			mediaSession.close();
 		};
-		var sc = this.streamConfig;
-
-		// I don't think these are effective when creating an answer - we have
-		// to mess with the SDP ourselves.
-		var constraints = {
-			'mandatory' : {
-				'OfferToReceiveAudio' : !!sc.audio && sc.audio.receive,
-				'OfferToReceiveVideo' : !!sc.video && sc.video.receive
-			}
-		};
+		var constraints = null;
 
 		// Start by requesting an offer
 		pc.createAnswer(answerSuccess, answerFailure, constraints);
@@ -651,18 +596,43 @@
 	 */
 	MediaSession.prototype._handleAddStream = function(event) {
 		var stream, audioTracks, videoTracks;
+		var mediaSession = this;
+		var fireEvent = function() {
+			// Make sure we only fire the event once
+			if (mediaSession.remoteMediaReceived) {
+				return;
+			}
+			mediaSession.remoteMediaReceived = true;
+			// Decouple event from this thread, in case we have not yet handed
+			// the media session to the higher-level app.
+			setTimeout(function() {
+				CrocSDK.Util.fireEvent(mediaSession, 'onRemoteMediaReceived', {});
+			}, 0);
+		};
+
+		var checkTrackLive = function(track) {
+			if (track.readyState === 'live') {
+				// Fire event now
+				fireEvent();
+			} else {
+				// Wait for the track to unmute
+				track.onunmute = fireEvent;
+			}
+		};
 
 		stream = event.stream;
 		audioTracks = stream.getAudioTracks();
 		videoTracks = stream.getVideoTracks();
 
 		if (videoTracks.length > 0) {
+			checkTrackLive(videoTracks[0]);
 			if (this.remoteVideoElement) {
 				setMediaElementSource(this.remoteVideoElement, stream);
 			} else {
 				console.log('Video received, but no remoteVideoElement provided');
 			}
 		} else if (audioTracks.length > 0) {
+			checkTrackLive(audioTracks[0]);
 			if (this.remoteAudioElement) {
 				setMediaElementSource(this.remoteAudioElement, stream);
 			} else {
