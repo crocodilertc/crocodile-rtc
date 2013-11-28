@@ -89,7 +89,18 @@
 			var capabilityApi = crocObject.capability;
 			var address = sipSession.remote_identity.uri.toAor().replace(
 					/^sip:/, '');
-			var mediaSession = new CrocSDK.MediaSession(this, sipSession, address);
+
+			// Disable DTLS by default until network supports it
+			var constraints = {
+				mandatory: {DtlsSrtpKeyAgreement: false}
+			};
+			// Unless, of course, the remote party has enabled it
+			if (sdp.attributes['fingerprint'] ||
+					sdp.media[0].attributes['fingerprint']) {
+				constraints.mandatory.DtlsSrtpKeyAgreement = true;
+			}
+
+			var mediaSession = new CrocSDK.MediaSession(this, sipSession, address, constraints);
 
 			// Process the sdp offer - this should kick off the ICE agent
 			var onSuccess = function() {
