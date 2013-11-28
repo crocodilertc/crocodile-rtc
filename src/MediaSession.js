@@ -1397,14 +1397,25 @@
 
 		if (this.peerConnection) {
 			this.peerConnection.close();
+			this.peerConnection = null;
 		}
 
+		// Stop any media streams we're holding
 		if (this.screenStream) {
 			this.screenStream.stop();
+			this.screenStream = null;
 		}
-
+		if (this.oldScreenStream) {
+			this.oldScreenStream.stop();
+			this.oldScreenStream = null;
+		}
 		if (this.localStream) {
 			this.localStream.stop();
+			this.localStream = null;
+		}
+		if (this.oldLocalStream) {
+			this.oldLocalStream.stop();
+			this.oldLocalStream = null;
 		}
 
 		if (this.sipSession) {
