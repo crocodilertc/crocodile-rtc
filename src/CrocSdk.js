@@ -872,9 +872,44 @@ var CrocSDK = {};
 		}
 	};
 
+	CrocSDK.Croc.prototype._setBrowserCapabilities = function() {
+		var cap = this.capabilities;
+		var pc = JsSIP.WebRTC.RTCPeerConnection;
+
+		// Set defaults
+		cap["croc.renegotiate"] = true;
+		cap["croc.dtmf"] = pc && !!pc.prototype.createDTMFSender;
+		cap["croc.screenshare"] = false;
+
+		// Opera
+		var m = navigator.userAgent.match(/ OPR\/([0-9]*)/);
+		if (m) {
+			return;
+		}
+
+		// Chrome
+		m = navigator.userAgent.match(/ Chrome\/([0-9]*)/);
+		if (m) {
+			cap["croc.screenshare"] = true;
+			return;
+		}
+
+		// Firefox
+		m = navigator.userAgent.match(/ Firefox\/([0-9]*)/);
+		if (m) {
+			cap["croc.renegotiate"] = false;
+			return;
+		}
+
+		// Otherwise assume nothing
+		cap["croc.renegotiate"] = false;
+	};
+
 	CrocSDK.Croc.prototype._detectCapabilities = function() {
 		var cap = this.capabilities;
 		var mst = window.MediaStreamTrack;
+
+		this._setBrowserCapabilities();
 
 		if (mst && mst.getSources) {
 			// Check capabilities without requesting access to media

@@ -8,7 +8,10 @@
 	};
 	var allowedTags = {
 		croc : {
-			sdkversion : 'string'
+			sdkversion: 'string',
+			renegotiate: 'boolean',
+			dtmf: 'boolean',
+			screenshare: 'boolean'
 		}
 	};
 
@@ -342,12 +345,17 @@
 					if (CrocSDK.Util.isType(value, type)) {
 						switch (type) {
 						case 'boolean':
-							if ((capabilities[cap]) && (tree !== 'custom')) {
-								featureTags += ';' + tag;
-							} else if ((capabilities[cap]) && (tree === 'custom')) {
-								featureTags += ';' + tag + '="TRUE"';
-							} else if ((!capabilities[cap]) && (tree === 'custom')) {
-								featureTags += ';' + tag + '="FALSE"';
+							if (tree === 'sip') {
+								if (capabilities[cap]) {
+									featureTags += ';' + tag;
+								}
+								// The absence of the tag indicates a false value
+							} else {
+								if (capabilities[cap]) {
+									featureTags += ';' + tag + '="TRUE"';
+								} else {
+									featureTags += ';' + tag + '="FALSE"';
+								}
 							}
 							break;
 						case 'string':
@@ -407,12 +415,24 @@
 						type = allowedTags[tree][tag];
 						if (type) {
 							switch (type) {
+							case 'boolean':
+								if (value === '"TRUE"') {
+									capabilities[cap] = true;
+								} else if (value === '"FALSE"') {
+									capabilities[cap] = false;
+								} else {
+									console.warn('Unexpected boolean format in feature tag:', value);
+								}
+								break;
 							case 'string':
 								if (value.slice(0, 2) === '"<' && value.slice(-2) === '>"') {
 									capabilities[cap] = value.slice(2, -2);
 								} else {
 									console.warn('Unexpected string format in feature tag:', value);
 								}
+								break;
+							default:
+								console.warn('Cannot parse feature tags of type:', type);
 								break;
 							}
 						}

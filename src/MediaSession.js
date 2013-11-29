@@ -124,9 +124,8 @@
 		// Official event, according to latest spec
 		if ('onsignalingstatechange' in pc) {
 			pc.onsignalingstatechange = onSigStateChange;
-		}
-		// What Chrome 26 and Mozilla 20 use
-		if ('onstatechange' in pc) {
+		} else if ('onstatechange' in pc) {
+			// What Chrome 26 and Mozilla 20 used
 			pc.onstatechange = onSigStateChange;
 		}
 
@@ -136,9 +135,8 @@
 		// Official event, according to latest spec
 		if ('oniceconnectionstatechange' in pc) {
 			pc.oniceconnectionstatechange = onIceConStateChange;
-		}
-		// What Chrome 26 and Mozilla 20 use
-		if ('onicechange' in pc) {
+		} else if ('onicechange' in pc) {
+			// What Chrome 26 and Mozilla 20 used
 			pc.onicechange = onIceConStateChange;
 		}
 	}
