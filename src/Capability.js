@@ -11,7 +11,9 @@
 			sdkversion: 'string',
 			renegotiate: 'boolean',
 			dtmf: 'boolean',
-			screenshare: 'boolean'
+			screenshare: 'boolean',
+			conference: 'boolean',
+			confreneg: 'boolean'
 		}
 	};
 

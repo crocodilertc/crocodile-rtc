@@ -880,10 +880,13 @@ var CrocSDK = {};
 		cap["croc.renegotiate"] = true;
 		cap["croc.dtmf"] = pc && !!pc.prototype.createDTMFSender;
 		cap["croc.screenshare"] = false;
+		cap["croc.conference"] = false;
+		cap["croc.confreneg"] = false;
 
 		// Opera
 		var m = navigator.userAgent.match(/ OPR\/([0-9]*)/);
 		if (m) {
+			cap["croc.conference"] = true;
 			return;
 		}
 
@@ -891,6 +894,7 @@ var CrocSDK = {};
 		m = navigator.userAgent.match(/ Chrome\/([0-9]*)/);
 		if (m) {
 			cap["croc.screenshare"] = true;
+			cap["croc.conference"] = true;
 			return;
 		}
 
@@ -1186,7 +1190,7 @@ var CrocSDK = {};
 	 *       "sip.data": true,
 	 *       "sip.text": true,
 	 *       "sip.video": true,
-	 *       "croc.sdkversion": "1.0",
+	 *       "croc.sdkversion": "1",
 	 *       "custom.myNameSpace: 'nameSpaceContent'"
 	 *     }
 	 *   </code>
@@ -1195,21 +1199,42 @@ var CrocSDK = {};
 	 *
 	 * @memberof CrocSDK.Croc
 	 * @typedef CrocSDK.Croc~Capabilities
-	 * @property {Boolean} [sip.audio=detected] <code>true</code> if the
-	 *           browser supports PeerConnection. Even if there is no microphone
-	 *           it might be possible to receive audio.
-	 * @property {Boolean} [sip.data=detected] <code>true</code> if MSRP
-	 *           relays are configured.
-	 * @property {Boolean} [sip.text=detected] <code>true</code> if MSRP
-	 *           relays are configured.
-	 * @property {Boolean} [sip.video=detected] <code>true</code> if the
-	 *           browser supports PeerConnection. Even if there is no web-cam it
-	 *           might be possible to receive video.
-	 * @property {String} [croc.sdkversion='1'] Cannot be changed or overridden.
-	 * @property [custom.<String>] Web-app developers can create their own
-	 *           capabilities within the <code>custom.</code> namespace.
-	 *           Custom capabilities may be simple present/not-present tags or
-	 *           attribute value pairs.
+	 * @property {Boolean} [sip.audio=detected]
+	 * <code>true</code> if an audio source is available. Even if no audio
+	 * source is available it might be possible to receive audio.
+	 * @property {Boolean} [sip.data=detected]
+	 * <code>true</code> if MSRP relays are configured.
+	 * @property {Boolean} [sip.text=detected]
+	 * <code>true</code> if MSRP relays are configured.
+	 * @property {Boolean} [sip.video=detected]
+	 * <code>true</code> if a video source is available. Even if no video
+	 * source is available it might be possible to receive video.
+	 * @property {String} [croc.sdkversion='1']
+	 * The version of the SDK.
+	 * @property {Boolean} [croc.renegotiate=detected]
+	 * Whether the browser is capable of renegotiation, which is needed for
+	 * hold/resume, altering media streams, etc.  Firefox (as of version 25)
+	 * does not currently support this functionality.
+	 * @property {Boolean} [croc.dtmf=detected]
+	 * Indicates whether the browser is capable of sending DTMF tones over an
+	 * audio stream.  Firefox (as of version 25) does not currently support this
+	 * functionality.
+	 * @property {Boolean} [croc.screenshare=detected]
+	 * Indicates whether the browser is capable of sharing the user's screen.
+	 * Chrome is the only browser that supports this experimental feature, and
+	 * even then only if the user has explicitly enabled it:
+	 * chrome://flags/#enable-usermedia-screen-capture
+	 * @property {Boolean} [croc.conference=detected]
+	 * Indicates whether the browser is compatible with the network-hosted
+	 * conference feature.  It is not currently compatible with Firefox due to
+	 * network limitations.
+	 * @property {Boolean} [croc.confreneg=detected]
+	 * Indicates whether renegotiation can be used in a network-hosted conference
+	 * session.  This is always false, due to current network limitations.
+	 * @property [custom.<String>]
+	 * Web-app developers can create their own capabilities within the
+	 * <code>custom.</code> namespace. Custom capabilities may be simple
+	 * present/not-present tags or attribute value pairs.
 	 */
 	/**
 	 * @memberof CrocSDK.Croc

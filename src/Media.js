@@ -178,9 +178,18 @@
 		// Check whether the refer had a known target session
 		var referredSession = data.session;
 		if (!referredSession) {
-			// Give the application a chance to handle this
-			CrocSDK.Util.fireEvent(this, 'onReferRequest',
-					new ReferRequestEvent(this, data.refer), true);
+			if (data.refer.refer_uri.host === 'conference.crocodilertc.net' &&
+					!this.crocObject.capabilities['croc.conference']) {
+				// This UA is not currently compatible with the conference feature
+				data.refer.reject({
+					status_code: 403,
+					reason_phrase: 'Conferencing not supported'
+				});
+			} else {
+				// Give the application a chance to handle this
+				CrocSDK.Util.fireEvent(this, 'onReferRequest',
+						new ReferRequestEvent(this, data.refer), true);
+			}
 			return;
 		}
 
